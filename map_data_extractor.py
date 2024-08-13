@@ -2,10 +2,11 @@ import subprocess
 import struct
 import hjson
 import zlib
+from PIL import Image
 from typing import BinaryIO, List, Tuple
 
 Pixel = Tuple[int, int, int]
-Image = List[List[Pixel]]
+RawImage = List[List[Pixel]]
 BLACK_PIXEL: Pixel = (0, 0, 0)
 WHITE_PIXEL: Pixel = (255, 255, 255)
 HEADER = b'\x89PNG\r\n\x1A\n'
@@ -14,7 +15,7 @@ HEADER = b'\x89PNG\r\n\x1A\n'
 #------------------------
 #Code to create png image
 #------------------------
-def generate_wm(width: int, height: int, wm) -> Image:
+def generate_wm(width: int, height: int, wm) -> RawImage:
     out = []
     for i in range(height):
         row = []
@@ -43,7 +44,7 @@ def chunk(out: BinaryIO, chunk_type: bytes, data: bytes) -> None:
 def make_ihdr(width: int, height: int, bit_depth: int, color_type: int) -> bytes:
     return struct.pack('>2I5B', width, height, bit_depth, color_type, 0, 0, 0)
 
-def encode_data(img: Image) -> List[int]:
+def encode_data(img: RawImage) -> List[int]:
     ret = []
 
     for row in img:
@@ -62,12 +63,12 @@ def compress_data(data: List[int]) -> bytes:
     data_bytes = bytearray(data)
     return zlib.compress(data_bytes)
 
-def make_idat(img: Image) -> bytes:
+def make_idat(img: RawImage) -> bytes:
     encoded_data = encode_data(img)
     compressed_data = compress_data(encoded_data)
     return compressed_data
 
-def dump_png(out: BinaryIO, img: Image) -> None:
+def dump_png(out: BinaryIO, img: RawImage) -> None:
     out.write(HEADER)  # start by writing the header
 
     assert len(img) > 0  # assume we were not given empty image data
@@ -84,7 +85,7 @@ def dump_png(out: BinaryIO, img: Image) -> None:
 
     chunk(out, b'IEND', data=b'')
 
-def save_png(img: Image, filename: str) -> None:
+def save_png(img: RawImage, filename: str) -> None:
     with open(filename, 'wb') as out:
         dump_png(out, img)
 
@@ -184,10 +185,15 @@ def get_image_wallmask(map_image_data, map_name):
 
 #Only ever call this to extract embeded image data
 def extract_map_data(map_name):
-    map_image_data = str(subprocess.run(["exiftool.exe", "", map_name], capture_output=True, text=True))
-    map_image_data = map_image_data = map_image_data[map_image_data.find("{ENTITIES}"):map_image_data.find(".{END WALKMASK}")+15]
+    #map_image_data = str(subprocess.run(["exiftool.exe", "", map_name], capture_output=True, text=True))
+    map_image = Image.open(map_name)
+    map_image.load()
+    map_image_data = str(map_image.info)
+    
+    map_image_data = map_image_data.replace("\\n", ".")
+    map_image_data = map_image_data[map_image_data.find("{ENTITIES}"):map_image_data.find(".{END WALKMASK}")+15]
 
     return([get_image_entities(map_image_data), get_image_wallmask(map_image_data, map_name)])
 
 
-#print(extract_map_data("ctf_eiger.png")[0])
+#print(extract_map_data("ctf_eiger.png"))
