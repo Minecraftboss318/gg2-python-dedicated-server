@@ -59,9 +59,10 @@ RESERVE_SLOT = 60
 # --------------------------------------------------------------------------
 # Updates lobby server of server existance
 def registration(boolean):
-    while(boolean):
+    # TODO: WTF DOES BOOLEAN MEAN!??!?!?!
+    while boolean:
         # Assembles Packet
-        occupied_slots = struct.pack(">H", len(player_list)-1)
+        occupied_slots = struct.pack(">H", len(player_list) - 1)
         num_bots = struct.pack(">H", 0)
         current_map_key_length = struct.pack(">B", 3)
         current_map_key = bytes("map", "utf-8")
@@ -86,7 +87,7 @@ def registration(boolean):
 
 
 def upnp_port_mapping():
-    while(True):
+    while True:
         # Gets host local ip
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as temp_socket:
             temp_socket.connect(("8.8.8.8", 80))
@@ -157,19 +158,19 @@ class Character:
         self.hp = 50
 
 
-class gg2_map:
+class GG2Map:
     def __init__(self, gg2_map_data):
         self.redspawns = []
         self.bluespawns = []
         self.intels = [None, None]
         for entity in gg2_map_data[0]:
-            if(entity.type == "redintel"):
+            if entity.type == "redintel":
                 self.intels[0] = entity
-            elif(entity.type == "blueintel"):
+            elif entity.type == "blueintel":
                 self.intels[1] = entity
-            elif(entity.type == "redspawn"):
+            elif entity.type == "redspawn":
                 self.redspawns.append(entity)
-            elif(entity.type == "bluespawn"):
+            elif entity.type == "bluespawn":
                 self.bluespawns.append(entity)
 
 
@@ -188,13 +189,13 @@ class GameServer:
     def serialize_state(self, update_type, client_player):
         to_send = struct.pack(">B", update_type)
 
-        if(update_type == FULL_UPDATE):
+        if update_type == FULL_UPDATE:
             to_send += struct.pack("<H", 30) # >H is the intended one
 
         to_send += struct.pack(">B", len(player_list))
 
         # Writes player stats n stuff
-        if(update_type != CAPS_UPDATE):
+        if update_type != CAPS_UPDATE:
             for joining_player in player_list:
                 to_send += struct.pack(">B", joining_player.stats[0])
                 to_send += struct.pack(">B", joining_player.stats[1])
@@ -212,18 +213,18 @@ class GameServer:
                 to_send += bytes("", "utf-8")
                 # Dominations except I don't do them
                 for victim in player_list:
-                    if(joining_player != victim):
+                    if joining_player != victim:
                         to_send += struct.pack(">B", 0)
 
                 # Subojects except they don't exist yet fully
-                if(client_player.character_object != None):
+                if client_player.character_object != None:
                     to_send += struct.pack(">B", 1)
 
                     # NEW
                     to_send += struct.pack(">B", client_player.character_object.key_state)
                     to_send += struct.pack("<H", client_player.character_object.aim_direction)
                     to_send += struct.pack(">B", client_player.character_object.aim_distance)
-                    if(update_type == QUICK_UPDATE or update_type == FULL_UPDATE):
+                    if update_type == QUICK_UPDATE or update_type == FULL_UPDATE:
                          to_send += struct.pack("<H", client_player.character_object.x*5)
                          to_send += struct.pack("<H", client_player.character_object.y*5)
                          to_send += struct.pack(">b", client_player.character_object.hspeed*8.5)
@@ -235,7 +236,7 @@ class GameServer:
                 else:
                     to_send += struct.pack(">B", 0)
 
-        if(update_type == FULL_UPDATE):
+        if update_type == FULL_UPDATE:
             # Red Intel
             to_send += struct.pack("<H", 1)
             # Multiply 5 because deserilized divide by 5
@@ -283,10 +284,10 @@ class GameServer:
             print(data)
             with open("connData.txt", "wb") as f:
                 f.write(data)
-            if(data[0] == HELLO):
+            if data[0] == HELLO:
                 print("Received Hello")
                 to_send = struct.pack(">B", 43)
-                if(data[1:17] == PROTOCOL_ID):
+                if data[1:17] == PROTOCOL_ID:
                     print("Compatible Protocol Received")
                     # Assembles Response
                     to_send = struct.pack(">B", HELLO)
@@ -304,7 +305,7 @@ class GameServer:
                     conn.sendall(to_send)
                     break
 
-            elif(data[0] == RESERVE_SLOT):
+            elif data[0] == RESERVE_SLOT:
                 print("Received Reserve Slot")
                 # Generates player ID for new player
                 client_player_id = random.randint(1000, 9999)
@@ -320,7 +321,7 @@ class GameServer:
                 )
                 # Assembles Response
                 to_send = struct.pack(">B", SERVER_FULL)
-                if(4 < 5):
+                if 4 < 5:
                     print("Slot Reserved")
                     to_send = struct.pack(">B", RESERVE_SLOT)
                 else:
@@ -328,7 +329,7 @@ class GameServer:
                     conn.sendall(to_send)
                     break
 
-            elif(data[0] == PLAYER_JOIN):
+            elif data[0] == PLAYER_JOIN:
                 print("Received Player Join")
                 # Writes JOIN_UPDATE with num of players and map area
                 to_send = struct.pack(">B", JOIN_UPDATE)
@@ -392,16 +393,16 @@ class GameServer:
             with open("connData2.txt", "wb") as f:
                 f.write(data)
             reading_position = 0;
-            while reading_position <= (len(data)-1):
-                if(data[reading_position] == PLAYER_LEAVE):
+            while reading_position <= len(data) - 1:
+                if data[reading_position] == PLAYER_LEAVE:
                     print("YO")
                     # Updates data reading position
                     reading_position = reading_position + 1
 
-                elif(data[reading_position] == PLAYER_CHANGETEAM):
+                elif data[reading_position] == PLAYER_CHANGETEAM:
                     print("Received Change Team")
                     # Player Death
-                    if(player_to_service.team != data[reading_position+1] and player_to_service.character_object != None):
+                    if player_to_service.team != data[reading_position+1] and player_to_service.character_object is not None:
                         self.server_to_send = struct.pack(">B", 10)
                         self.server_to_send += struct.pack(">B", 1)
                         self.server_to_send += struct.pack(">B", 1)
@@ -418,20 +419,20 @@ class GameServer:
                     # Updates data reading position
                     reading_position = reading_position + 2
 
-                elif(data[reading_position] == PLAYER_CHANGECLASS):
+                elif data[reading_position] == PLAYER_CHANGECLASS:
                     print("Received Change Class")
                     player_to_service.respawn_timer = 1
                     player_to_service.character_object = None
                     # Player Set Class
-                    player_to_service._class = data[reading_position+1]
+                    player_to_service._class = data[reading_position + 1]
                     self.server_to_send += struct.pack(">B", PLAYER_CHANGECLASS)
                     self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
                     self.server_to_send += struct.pack(">B", player_to_service._class)
                     # Updates data reading position
                     reading_position = reading_position + 2
 
-                elif(data[reading_position] == INPUTSTATE):
-                    if(player_to_service.character_object != None):
+                elif data[reading_position] == INPUTSTATE:
+                    if player_to_service.character_object is not None:
                         player_to_service.character_object.key_state = data[reading_position+1]
                         player_to_service.character_object.aim_direction = struct.unpack("<H", data[reading_position+2:reading_position+4])[0] # *360/65536
                         player_to_service.character_object.aim_distance = data[reading_position+4]
@@ -445,7 +446,6 @@ class GameServer:
                         print(player_to_service.character_object.last_key_state)
                     # Updates data reading position
                     reading_position = reading_position + 5
-
                 else:
                     # self.server_to_send = 0
                     print("Not yet added thing")
@@ -465,22 +465,39 @@ class GameServer:
     def process_client_alarms(self, player_to_service):
         # Respawn Alarm
         player_to_service.respawn_timer = player_to_service.respawn_timer - 1
-        if(player_to_service.respawn_timer <= 0 and player_to_service.character_object == None and (player_to_service.team == 0 or player_to_service.team == 1) and (0 <= player_to_service._class and player_to_service._class <= 9)):
+        if (player_to_service.respawn_timer <= 0
+                and player_to_service.character_object is None
+                and (player_to_service.team == 0
+                     or player_to_service.team == 1)
+                and (0 <= player_to_service._class
+                     and player_to_service._class <= 9)):
             # Player Spawning
             player_to_service.character_object = Character(player_to_service)
             self.server_to_send += struct.pack(">B", PLAYER_SPAWN)
-            self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
-            if(player_to_service.team == 0):
-                random_spawn = random.randint(0, len(loaded_map.redspawns)-1)
+            self.server_to_send += struct.pack(
+                ">B",
+                player_list.index(player_to_service),
+            )
+            if player_to_service.team == 0:
+                random_spawn = random.randint(0, len(loaded_map.redspawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning red player locally
-                player_to_service.character_object.x = loaded_map.redspawns[random_spawn].x
-                player_to_service.character_object.y = loaded_map.redspawns[random_spawn].y
-            elif(player_to_service.team == 1):
-                random_spawn = random.randint(0, len(loaded_map.bluespawns)-1)
+                player_to_service.character_object.x = loaded_map.redspawns[
+                    random_spawn
+                ].x
+                player_to_service.character_object.y = loaded_map.redspawns[
+                    random_spawn
+                ].y
+            elif player_to_service.team == 1:
+                random_spawn = random.randint(
+                    0,
+                    len(loaded_map.bluespawns) - 1,
+                )
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning blue player locally
-                player_to_service.character_object.x = loaded_map.bluespawns[random_spawn].x
+                player_to_service.character_object.x = loaded_map.bluespawns[
+                    random_spawn
+                    ].x
                 player_to_service.character_object.y = loaded_map.bluespawns[random_spawn].y
             self.server_to_send += struct.pack(">B", 0)
             print("Spawned Player")
@@ -489,27 +506,27 @@ class GameServer:
         self.server_to_send = bytes("", "utf-8")
         while True:
             # Processes client commands
-            if(1 < len(player_list)):
+            if len(player_list) > 1:
                 for player_to_service in player_list:
-                    if(player_to_service._id != 1000):
+                    if player_to_service._id != 1000:
                         self.process_client_commands(player_to_service)
 
             # Alarm Updating Here
-            if(1 < len(player_list)):
-                for player_to_service in player_list:
-                    if(player_to_service._id != 1000):
+            #if len(player_list) > 1:
+            #    for player_to_service in player_list:
+            #        if player_to_service._id != 1000:
                         self.process_client_alarms(player_to_service)
 
             # Position/physics object updating here
 
             # Joins 1 new player each loop
-            if(0 < len(self.new_connections)):
+            if self.new_connections:
                 self.join_player(self.new_connections[0])
 
             # Sends update to all players
-            if(0 < len(self.server_to_send)):
+            if self.server_to_send:
                 for player_to_service in player_list:
-                    if(player_to_service._id != 1000):
+                    if player_to_service._id != 1000:
                         conn = player_to_service.connection
                         conn.sendall(self.server_to_send)
 
@@ -519,11 +536,18 @@ class GameServer:
 
     def run_game_server(self):
         while True:
-            if(1 < len(player_list)):
+            if len(player_list) > 1:
                 for player_to_service in player_list:
-                    if(player_to_service._id != 1000):
-                        if(player_to_service.character_object == None and player_to_service.respawn_timer <= 0 and (player_to_service.team == 0 or player_to_service.team == 1) and (0 <= player_to_service._class and player_to_service._class <= 9)):
-                            player_to_service.character_object = Character(player_to_service)
+                    if player_to_service._id != 1000:
+                        if (player_to_service.character_object is None
+                                and player_to_service.respawn_timer <= 0
+                                and (player_to_service.team == 0
+                                        or player_to_service.team == 1)
+                                and (0 <= player_to_service._class
+                                     and player_to_service._class <= 9)):
+                            player_to_service.character_object = Character(
+                                player_to_service
+                            )
                             print("Player Character Created")
 
             time.sleep(0.01)
@@ -675,7 +699,7 @@ REG_PACKET_THREE += PROTOCOL_ID
 
 def main():
     # Maps UPNP port if UPNP is enabled
-    if(USE_UPNP == True):
+    if USE_UPNP == True:
         upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
         upnp_thread.start()
         time.sleep(5)
@@ -687,7 +711,7 @@ def main():
 
     # Gets map entities and wallmask
     global loaded_map
-    loaded_map = gg2_map(map_data_extractor.extract_map_data("ctf_eiger.png"))
+    loaded_map = GG2Map(map_data_extractor.extract_map_data("ctf_eiger.png"))
 
     time.sleep(0.1)
     game_server = GameServer()
@@ -731,8 +755,7 @@ def upnp_exit():
     )
 
 if __name__ == "__main__":
-    if SERVER_PORT < 0:
-        exit()
+    assert SERVER_PORT >= 0
 
     try:
         main()

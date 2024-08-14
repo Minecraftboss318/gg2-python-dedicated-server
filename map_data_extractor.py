@@ -137,7 +137,7 @@ def get_image_entities(map_image_data):
     entities_start = map_image_data.find("{ENTITIES}")
     entities_end = map_image_data.find("{END ENTITIES}") - 1
 
-    if(map_image_data[entities_start + 11] == "["):
+    if map_image_data[entities_start + 11] == "[":
         print("New Entity Format")
         image_entities = map_image_data[entities_start + 11:entities_end]
         image_entities = image_entities.replace(",", "\n")
@@ -159,7 +159,7 @@ def get_image_entities(map_image_data):
             print(*entity[0:2], 1, entity[2], 1)
             entity_objects.append(LegacyEntity(*entity[0:2], 1, entity[2], 1))
 
-    return(entity_objects)
+    return entity_objects
 
 
 # ------------------------
@@ -172,7 +172,7 @@ def get_image_wallmask(map_image_data, map_name):
 
     wm_width = ""
     while True:
-        if(image_wm_data[0] == "."):
+        if image_wm_data[0] == ".":
             image_wm_data = image_wm_data[1:len(image_wm_data)]
             break
 
@@ -181,7 +181,7 @@ def get_image_wallmask(map_image_data, map_name):
 
     wm_height = ""
     while True:
-        if(image_wm_data[0] == "."):
+        if image_wm_data[0] == ".":
             image_wm_data = image_wm_data[1:len(image_wm_data)]
             break
 
@@ -194,9 +194,9 @@ def get_image_wallmask(map_image_data, map_name):
     image_bin_data = []
 
     for character in image_wm_data:
-        if(character == "a"):
+        if character == "a":
             character = 92 - 32
-        elif(character == "b"):
+        elif character == "b":
             character = 39 - 32
         else:
             character = ord(character) - 32
@@ -222,10 +222,10 @@ def extract_map_data(map_name):
     entities_end = map_image_data.find(".{END WALKMASK}") + 15
     map_image_data = map_image_data[entities_start:entities_end]
 
-    return([
+    return [
         get_image_entities(map_image_data),
         get_image_wallmask(map_image_data, map_name),
-    ])
+    ]
 
 
 # print(extract_map_data("ctf_eiger.png"))
