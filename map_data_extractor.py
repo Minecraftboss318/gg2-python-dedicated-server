@@ -45,8 +45,22 @@ def chunk(out: BinaryIO, chunk_type: bytes, data: bytes) -> None:
     out.write(struct.pack(">I", checksum))
 
 
-def make_ihdr(width: int, height: int, bit_depth: int, color_type: int) -> bytes:
-    return struct.pack(">2I5B", width, height, bit_depth, color_type, 0, 0, 0)
+def make_ihdr(
+    width: int,
+    height: int,
+    bit_depth: int,
+    color_type: int,
+) -> bytes:
+    return struct.pack(
+        ">2I5B",
+        width,
+        height,
+        bit_depth,
+        color_type,
+        0,
+        0,
+        0,
+    )
 
 
 def encode_data(img: RawImage) -> List[int]:
@@ -120,9 +134,12 @@ class Entity:
 def get_image_entities(map_image_data):
     entity_objects = []
 
-    if(map_image_data[map_image_data.find("{ENTITIES}") + 11] == "["):
+    entities_start = map_image_data.find("{ENTITIES}")
+    entities_end = map_image_data.find("{END ENTITIES}") - 1
+
+    if(map_image_data[entities_start + 11] == "["):
         print("New Entity Format")
-        image_entities = map_image_data[map_image_data.find("{ENTITIES}")+11:map_image_data.find("{END ENTITIES}")-1]
+        image_entities = map_image_data[entities_start + 11:entities_end]
         image_entities = image_entities.replace(",", "\n")
         image_entities = image_entities.replace("}", "\n}")
         image_entities = hjson.loads(image_entities)
@@ -133,13 +150,13 @@ def get_image_entities(map_image_data):
                 
     else:
         print("Old Entity Format")
-        image_entities = map_image_data[map_image_data.find("{ENTITIES}"):map_image_data.find("{END ENTITIES}")-1]
+        image_entities = map_image_data[entities_start:entities_end]
 
         entity_list = image_entities.split(".")
         entity_list = entity_list[1:len(entity_list)]
 
         for entity_part_index in range(0, len(entity_list), 3):
-            entity = entity_list[entity_part_index:entity_part_index+3]
+            entity = entity_list[entity_part_index:entity_part_index + 3]
             print(*entity[0:2], 1, entity[2], 1)
             entity_objects.append(LegacyEntity(*entity[0:2], 1, entity[2], 1))
 
@@ -150,7 +167,9 @@ def get_image_entities(map_image_data):
 # Code to extract wallmask
 # ------------------------
 def get_image_wallmask(map_image_data, map_name):
-    image_wm_data = map_image_data[map_image_data.find("{WALKMASK}")+11:map_image_data.find(".{END WALKMASK}")]
+    wall_mask_start = map_image_data.find("{WALKMASK}") + 11
+    wall_mask_end = map_image_data.find(".{END WALKMASK}")
+    image_wm_data = map_image_data[wall_mask_start:wall_mask_end]
 
     wm_width = ""
     while True:
@@ -195,15 +214,19 @@ def get_image_wallmask(map_image_data, map_name):
 
 # Only ever call this to extract embeded image data
 def extract_map_data(map_name):
-    # map_image_data = str(subprocess.run(["exiftool.exe", "", map_name], capture_output=True, text=True))
     map_image = Image.open(map_name)
     map_image.load()
     map_image_data = str(map_image.info)
     
     map_image_data = map_image_data.replace("\\n", ".")
-    map_image_data = map_image_data[map_image_data.find("{ENTITIES}"):map_image_data.find(".{END WALKMASK}")+15]
+    entities_start = map_image_data.find("{ENTITIES}")
+    entities_end = map_image_data.find(".{END WALKMASK}") + 15
+    map_image_data = map_image_data[entities_start:entities_end]
 
-    return([get_image_entities(map_image_data), get_image_wallmask(map_image_data, map_name)])
+    return([
+        get_image_entities(map_image_data),
+        get_image_wallmask(map_image_data, map_name),
+    ])
 
 
 # print(extract_map_data("ctf_eiger.png"))

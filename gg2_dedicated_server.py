@@ -68,7 +68,15 @@ def registration(boolean):
         current_map_key = bytes("map", "utf-8")
         current_map_length = struct.pack(">H", 9)
         current_map = bytes("ctf_eiger", "utf-8")
-        packet = REG_PACKET_ONE + occupied_slots + num_bots + REG_PACKET_TWO + current_map_key_length + current_map_key + current_map_length + current_map + REG_PACKET_THREE
+        packet = REG_PACKET_ONE
+            + occupied_slots
+            + num_bots
+            + REG_PACKET_TWO
+            + current_map_key_length
+            + current_map_key
+            + current_map_length
+            + current_map
+            + REG_PACKET_THREE
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
@@ -108,7 +116,7 @@ def upnp_port_mapping():
             NewInternalClient=HOST_IP,
             NewEnabled=1,
             NewPortMappingDescription="GGPDS Port",
-            NewLeaseDuration=150
+            NewLeaseDuration=150,
         )
         print("---UPNP Port Mapped---")
         time.sleep(135)
@@ -173,7 +181,10 @@ class GameServer:
 
     def add_connection(self, conn, addr):
         self.new_connections.append(conn)
-        print(f"Connections: {len(self.new_connections) + len(player_list) - 1)}\n")
+        print(
+            "Connections:"
+            f"{len(self.new_connections) + len(player_list) - 1)}\n"
+        )
 
     def serialize_state(self, update_type, client_player):
         to_send = struct.pack(">B", update_type)
@@ -205,7 +216,7 @@ class GameServer:
                     if(joining_player != victim):
                         to_send += struct.pack(">B", 0)
                         
-                # Subojects except they don't exist yet fuuuuuuuuulllllllllyyyyy
+                # Subojects except they don't exist yet fully
                 if(client_player.character_object != None):
                     to_send += struct.pack(">B", 1)
                     
@@ -228,7 +239,8 @@ class GameServer:
         if(update_type == FULL_UPDATE):
             # Red Intel
             to_send += struct.pack("<H", 1)
-            to_send += struct.pack("<H", loaded_map.intels[0].x*5) # Multiply 5 because deserilized divide by 5
+            # Multiply 5 because deserilized divide by 5
+            to_send += struct.pack("<H", loaded_map.intels[0].x*5)
             to_send += struct.pack("<H", loaded_map.intels[0].y*5)
             to_send += struct.pack("<h", -1)
             # Blue Intel
@@ -300,7 +312,13 @@ class GameServer:
                 while(client_player_id in player_list):
                     client_player_id = random.randint(1000, 9999)
                 # playerID, playerName, playerTeam, playerClass
-                client_player = Player(conn, int(client_player_id), str(data[2:data[1] + 2].decode()), 2, 0)
+                client_player = Player(
+                    conn,
+                    int(client_player_id),
+                    str(data[2:data[1] + 2].decode()),
+                    2,
+                    0,
+                )
                 # Assembles Response
                 to_send = struct.pack(">B", SERVER_FULL)
                 if(4 < 5):
@@ -522,60 +540,151 @@ player_list = [Player(None, 1000, "Host", 2, 0)]
 
 # Stuff below is setting up packet for registration
 # Registration Packet 1
-REG_PACKET_ONE = struct.pack(">16B", 181, 218, 226, 232, 66, 79, 158, 208, 15, 203, 140, 33, 199, 202, 19, 82) # Registration ID
-REG_PACKET_ONE += struct.pack(">16B", 17, 211, 119, 67, 190, 25, 205, 141, 171, 76, 89, 102, 234, 11, 69, 132) # Server ID
-REG_PACKET_ONE += struct.pack(">16B", 28, 207, 22, 177, 67, 109, 133, 111, 80, 77, 204, 26, 243, 6, 170, 167)  # Lobby ID
-REG_PACKET_ONE += struct.pack(">B", 0)              # Connection Type (UDP or TCP)
-REG_PACKET_ONE += struct.pack(">H", SERVER_PORT)    # Hosting Port
-REG_PACKET_ONE += struct.pack(">H", 5)              # Player Limit
+REG_PACKET_ONE = struct.pack(
+    ">16B",
+    181,
+    218,
+    226,
+    232,
+    66,
+    79,
+    158,
+    208,
+    15,
+    203,
+    140,
+    33,
+    199,
+    202,
+    19,
+    82,
+) # Registration ID
+REG_PACKET_ONE += struct.pack(
+    ">16B",
+    17,
+    211,
+    119,
+    67,
+    190,
+    25,
+    205,
+    141,
+    171,
+    76,
+    89,
+    102,
+    234,
+    11,
+    69,
+    132,
+) # Server ID
+REG_PACKET_ONE += struct.pack(
+    ">16B",
+    28,
+    207,
+    22,
+    177,
+    67,
+    109,
+    133,
+    111,
+    80,
+    77,
+    204,
+    26,
+    243,
+    6,
+    170,
+    167,
+)  # Lobby ID
+REG_PACKET_ONE += struct.pack(">B", 0)           # Connection Type (UDP or TCP)
+REG_PACKET_ONE += struct.pack(">H", SERVER_PORT) # Hosting Port
+REG_PACKET_ONE += struct.pack(">H", 5)           # Player Limit
 
 # Registration Packet 2
 REG_PACKET_TWO = struct.pack(">H", 0)  # Server Password
 REG_PACKET_TWO += struct.pack(">H", 7) # Amount of Value Groups
 # Server Name
-REG_PACKET_TWO += struct.pack(">B", 4)                         # Server Name Key Length
-REG_PACKET_TWO += bytes("name", "utf-8")                       # Server Name Key
-REG_PACKET_TWO += struct.pack(">H", 21)                        # Server Name Length
-REG_PACKET_TWO += bytes("Python Server Testing", "utf-8")      # Server Name
+# Server Name Key Length
+REG_PACKET_TWO += struct.pack(">B", 4)
+# Server Name Key
+REG_PACKET_TWO += bytes("name", "utf-8")
+# Server Name Length
+REG_PACKET_TWO += struct.pack(">H", 21)
+# Server Name
+REG_PACKET_TWO += bytes("Python Server Testing", "utf-8")
 # Game Name
-REG_PACKET_TWO += struct.pack(">B", 4)                         # Game Name Key Length
-REG_PACKET_TWO += bytes("game", "utf-8")                       # Game Name Key
-REG_PACKET_TWO += struct.pack(">H", 15)                        # Game Name Length
-REG_PACKET_TWO += bytes("Gang Garrison 2", "utf-8")            # Game Name
+# Game Name Key Length
+REG_PACKET_TWO += struct.pack(">B", 4)
+# Game Name Key
+REG_PACKET_TWO += bytes("game", "utf-8")
+# Game Name Length
+REG_PACKET_TWO += struct.pack(">H", 15)
+# Game Name
+REG_PACKET_TWO += bytes("Gang Garrison 2", "utf-8")
 # Game Short
-REG_PACKET_TWO += struct.pack(">B", 10)                        # Game Short Key Length
-REG_PACKET_TWO += bytes("game_short", "utf-8")                 # Game Short Key
-REG_PACKET_TWO += struct.pack(">H", 3)                         # Game Short Length
-REG_PACKET_TWO += bytes("gg2", "utf-8")                        # Game Short
+# Game Short Key Length
+REG_PACKET_TWO += struct.pack(">B", 10)
+# Game Short Key
+REG_PACKET_TWO += bytes("game_short", "utf-8")
+# Game Short Length
+REG_PACKET_TWO += struct.pack(">H", 3)
+# Game Short
+REG_PACKET_TWO += bytes("gg2", "utf-8")
 # Game Version
-REG_PACKET_TWO += struct.pack(">B", 8)                         # Game Version Key Length
-REG_PACKET_TWO += bytes("game_ver", "utf-8")                   # Game Version Key
-REG_PACKET_TWO += struct.pack(">H", 6)                         # Game Version Length
-REG_PACKET_TWO += bytes("v2.9.2", "utf-8")                     # Game Version
+# Game Version Key Length
+REG_PACKET_TWO += struct.pack(">B", 8)
+# Game Version Key
+REG_PACKET_TWO += bytes("game_ver", "utf-8")
+# Game Version Length
+REG_PACKET_TWO += struct.pack(">H", 6)
+# Game Version
+REG_PACKET_TWO += bytes("v2.9.2", "utf-8")
 # Game URL
-REG_PACKET_TWO += struct.pack(">B", 8)                         # Game URL Key Length
-REG_PACKET_TWO += bytes("game_url", "utf-8")                   # Game URL Key
-REG_PACKET_TWO += struct.pack(">H", 27)                        # Game URL Length
-REG_PACKET_TWO += bytes("http://www.ganggarrison.com", "utf-8")# Game URL
+# Game URL Key Length
+REG_PACKET_TWO += struct.pack(">B", 8)
+# Game URL Key
+REG_PACKET_TWO += bytes("game_url", "utf-8")
+# Game URL Length
+REG_PACKET_TWO += struct.pack(">H", 27)
+# Game URL
+REG_PACKET_TWO += bytes("http://www.ganggarrison.com", "utf-8")
 
 # Registration Packet Const 3
 REG_PACKET_THREE = struct.pack(">B", 11)             # Protocol ID Key Length
 REG_PACKET_THREE += bytes("protocol_id", "utf-8")    # Protocol ID Key
 REG_PACKET_THREE += struct.pack(">H", 16)            # Protocol ID Length
-PROTOCOL_ID = struct.pack(">16B", 179, 28, 34, 9, 66, 86, 154, 25, 208, 239, 199, 28, 83, 115, 189, 117) # Protocol ID
+PROTOCOL_ID = struct.pack(
+    ">16B",
+    179,
+    28,
+    34,
+    9,
+    66,
+    86,
+    154,
+    25,
+    208,
+    239,
+    199,
+    28,
+    83,
+    115,
+    189,
+    117
+) # Protocol ID
 REG_PACKET_THREE += PROTOCOL_ID
-
 
 def main():
     # Maps UPNP port if UPNP is enabled
     if(USE_UPNP == True):
-        upnp_thread = threading.Thread(target=upnp_port_mapping, args=())
+        upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
         upnp_thread.start()
         time.sleep(5)
 
 
     # Starts registration loop thread
-    reg_thread = threading.Thread(target=registration, args=(True,))
+    reg_thread = threading.Thread(target = registration, args = (True))
     reg_thread.start()
 
     # Gets map entities and wallmask
@@ -584,7 +693,10 @@ def main():
 
     time.sleep(0.1)
     game_server = GameServer()
-    server_networking_thread = threading.Thread(target=GameServer.run_game_server_networking, args=(game_server,))
+    server_networking_thread = threading.Thread(
+        target = GameServer.run_game_server_networking,
+        args = (game_server)
+    )
     server_networking_thread.start()
 
     time.sleep(0.1)
@@ -615,9 +727,9 @@ def upnp_exit():
     # Finally, add the new port mapping to the IGD
     # This specific action returns an empty dict: {}
     service.DeletePortMapping(
-        NewRemoteHost="",
-        NewExternalPort=SERVER_PORT,
-        NewProtocol="TCP"
+        NewRemoteHost = "",
+        NewExternalPort = SERVER_PORT,
+        NewProtocol = "TCP"
     )
 
 if __name__ == "__main__":
