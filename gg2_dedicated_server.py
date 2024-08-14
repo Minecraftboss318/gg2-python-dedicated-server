@@ -65,9 +65,9 @@ def registration(boolean):
         occupied_slots = struct.pack(">H", len(player_list)-1)
         num_bots = struct.pack(">H", 0)
         current_map_key_length = struct.pack(">B", 3)
-        current_map_key = bytes("map", 'utf-8')
+        current_map_key = bytes("map", "utf-8")
         current_map_length = struct.pack(">H", 9)
-        current_map = bytes("ctf_eiger", 'utf-8')
+        current_map = bytes("ctf_eiger", "utf-8")
         packet = REG_PACKET_ONE + occupied_slots + num_bots + REG_PACKET_TWO + current_map_key_length + current_map_key + current_map_length + current_map + REG_PACKET_THREE
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -94,20 +94,20 @@ def upnp_port_mapping():
         # Gets device services
         device.get_services()
         # Sets service
-        service = device['WANIPConn1']
+        service = device["WANIPConn1"]
         # Gets actions for said service
         service.get_actions()
 
         # Maps port
         service.AddPortMapping.get_input_arguments()
         service.AddPortMapping(
-            NewRemoteHost='',
+            NewRemoteHost="",
             NewExternalPort=SERVER_PORT,
-            NewProtocol='TCP',
+            NewProtocol="TCP",
             NewInternalPort=SERVER_PORT,
             NewInternalClient=HOST_IP,
             NewEnabled=1,
-            NewPortMappingDescription='GGPDS Port',
+            NewPortMappingDescription="GGPDS Port",
             NewLeaseDuration=150
         )
         print("---UPNP Port Mapped---")
@@ -168,7 +168,7 @@ class gg2_map:
 
 class GameServer:
     def __init__(self):
-        self.server_to_send = bytes("", 'utf-8')
+        self.server_to_send = bytes("", "utf-8")
         self.new_connections = [];
 
     def add_connection(self, conn, addr):
@@ -199,7 +199,7 @@ class GameServer:
                 to_send += struct.pack(">B", joining_player.stats[10])
                 to_send += struct.pack(">B", 0)
                 to_send += struct.pack(">H", 0)
-                to_send += bytes("", 'utf-8')
+                to_send += bytes("", "utf-8")
                 # Dominations except I don't do them
                 for victim in player_list:
                     if(joining_player != victim):
@@ -280,14 +280,14 @@ class GameServer:
                     # Assembles Response
                     to_send = struct.pack(">B", HELLO)
                     to_send += struct.pack(">B", 21)
-                    to_send += bytes("Python Server Testing", 'utf-8')
+                    to_send += bytes("Python Server Testing", "utf-8")
                     to_send += struct.pack(">B", 9)
-                    to_send += bytes("ctf_eiger", 'utf-8')
+                    to_send += bytes("ctf_eiger", "utf-8")
                     to_send += struct.pack(">B", 0)
-                    to_send += bytes("", 'utf-8')
+                    to_send += bytes("", "utf-8")
                     to_send += struct.pack(">B", 0)
                     to_send += struct.pack(">H", 0)
-                    to_send += bytes("", 'utf-8')
+                    to_send += bytes("", "utf-8")
                 else:
                     print("Incompatible Protocol Received")
                     conn.sendall(to_send)
@@ -321,15 +321,15 @@ class GameServer:
                 # Writes the current map n stuff
                 to_send += struct.pack(">B", CHANGE_MAP)
                 to_send += struct.pack(">B", 9)
-                to_send += bytes("ctf_eiger", 'utf-8')
+                to_send += bytes("ctf_eiger", "utf-8")
                 to_send += struct.pack(">B", 0)
-                to_send += bytes("", 'utf-8')
+                to_send += bytes("", "utf-8")
 
                 # Player joining n stuff
                 for player_index, joining_player in enumerate(player_list):
                     to_send += struct.pack(">B", PLAYER_JOIN)
                     to_send += struct.pack(">B", len(joining_player.name))
-                    to_send += bytes(joining_player.name, 'utf-8')
+                    to_send += bytes(joining_player.name, "utf-8")
                     # Set player class
                     to_send += struct.pack(">B", PLAYER_CHANGECLASS)
                     to_send += struct.pack(">B", player_index)
@@ -345,12 +345,12 @@ class GameServer:
                 # Server Player Join
                 self.server_to_send += struct.pack(">B", PLAYER_JOIN)
                 self.server_to_send += struct.pack(">B", len(client_player.name))
-                self.server_to_send += bytes(client_player.name, 'utf-8')
+                self.server_to_send += bytes(client_player.name, "utf-8")
 
                 # Server Message
                 to_send += struct.pack(">B", MESSAGE_STRING)
                 to_send += struct.pack(">B", 12)
-                to_send += bytes("You Made It!", 'utf-8')
+                to_send += bytes("You Made It!", "utf-8")
                 print("Sent New Connection Data Back")
                 conn.sendall(to_send)
                 print("Connection setup complete")
@@ -470,7 +470,7 @@ class GameServer:
             print("Spawned Player")
 
     def run_game_server_networking(self):
-        self.server_to_send = bytes("", 'utf-8')
+        self.server_to_send = bytes("", "utf-8")
         while True:
             # Processes client commands
             if(1 < len(player_list)):
@@ -498,7 +498,7 @@ class GameServer:
                         conn.sendall(self.server_to_send)
 
             # Clears data to send
-            self.server_to_send = bytes("", 'utf-8')
+            self.server_to_send = bytes("", "utf-8")
             time.sleep(0.01)
 
     def run_game_server(self):
@@ -537,33 +537,33 @@ REG_PACKET_TWO = struct.pack(">H", 0)  # Server Password
 REG_PACKET_TWO += struct.pack(">H", 7) # Amount of Value Groups
 # Server Name
 REG_PACKET_TWO += struct.pack(">B", 4)                         # Server Name Key Length
-REG_PACKET_TWO += bytes("name", 'utf-8')                       # Server Name Key
+REG_PACKET_TWO += bytes("name", "utf-8")                       # Server Name Key
 REG_PACKET_TWO += struct.pack(">H", 21)                        # Server Name Length
-REG_PACKET_TWO += bytes("Python Server Testing", 'utf-8')      # Server Name
+REG_PACKET_TWO += bytes("Python Server Testing", "utf-8")      # Server Name
 # Game Name
 REG_PACKET_TWO += struct.pack(">B", 4)                         # Game Name Key Length
-REG_PACKET_TWO += bytes("game", 'utf-8')                       # Game Name Key
+REG_PACKET_TWO += bytes("game", "utf-8")                       # Game Name Key
 REG_PACKET_TWO += struct.pack(">H", 15)                        # Game Name Length
-REG_PACKET_TWO += bytes("Gang Garrison 2", 'utf-8')            # Game Name
+REG_PACKET_TWO += bytes("Gang Garrison 2", "utf-8")            # Game Name
 # Game Short
 REG_PACKET_TWO += struct.pack(">B", 10)                        # Game Short Key Length
-REG_PACKET_TWO += bytes("game_short", 'utf-8')                 # Game Short Key
+REG_PACKET_TWO += bytes("game_short", "utf-8")                 # Game Short Key
 REG_PACKET_TWO += struct.pack(">H", 3)                         # Game Short Length
-REG_PACKET_TWO += bytes("gg2", 'utf-8')                        # Game Short
+REG_PACKET_TWO += bytes("gg2", "utf-8")                        # Game Short
 # Game Version
 REG_PACKET_TWO += struct.pack(">B", 8)                         # Game Version Key Length
-REG_PACKET_TWO += bytes("game_ver", 'utf-8')                   # Game Version Key
+REG_PACKET_TWO += bytes("game_ver", "utf-8")                   # Game Version Key
 REG_PACKET_TWO += struct.pack(">H", 6)                         # Game Version Length
-REG_PACKET_TWO += bytes("v2.9.2", 'utf-8')                     # Game Version
+REG_PACKET_TWO += bytes("v2.9.2", "utf-8")                     # Game Version
 # Game URL
 REG_PACKET_TWO += struct.pack(">B", 8)                         # Game URL Key Length
-REG_PACKET_TWO += bytes("game_url", 'utf-8')                   # Game URL Key
+REG_PACKET_TWO += bytes("game_url", "utf-8")                   # Game URL Key
 REG_PACKET_TWO += struct.pack(">H", 27)                        # Game URL Length
-REG_PACKET_TWO += bytes("http://www.ganggarrison.com", 'utf-8')# Game URL
+REG_PACKET_TWO += bytes("http://www.ganggarrison.com", "utf-8")# Game URL
 
 # Registration Packet Const 3
 REG_PACKET_THREE = struct.pack(">B", 11)             # Protocol ID Key Length
-REG_PACKET_THREE += bytes("protocol_id", 'utf-8')    # Protocol ID Key
+REG_PACKET_THREE += bytes("protocol_id", "utf-8")    # Protocol ID Key
 REG_PACKET_THREE += struct.pack(">H", 16)            # Protocol ID Length
 PROTOCOL_ID = struct.pack(">16B", 179, 28, 34, 9, 66, 86, 154, 25, 208, 239, 199, 28, 83, 115, 189, 117) # Protocol ID
 REG_PACKET_THREE += PROTOCOL_ID
@@ -593,7 +593,7 @@ def main():
     time.sleep(0.1)
     # Listens for connections and starts a thread to handle them
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', SERVER_PORT))
+        s.bind(("", SERVER_PORT))
         s.listen()
         print("Listening on port " + str(SERVER_PORT))
         while True:
@@ -610,7 +610,7 @@ def upnp_exit():
     # Gets device services
     device.get_services()
     # Sets service
-    service = device['WANIPConn1']
+    service = device["WANIPConn1"]
     # Gets actions for said service
     service.get_actions()
 
@@ -618,12 +618,12 @@ def upnp_exit():
     # Finally, add the new port mapping to the IGD
     # This specific action returns an empty dict: {}
     service.DeletePortMapping(
-        NewRemoteHost='',
+        NewRemoteHost="",
         NewExternalPort=SERVER_PORT,
-        NewProtocol='TCP'
+        NewProtocol="TCP"
     )
 
-if __name__ == "__main":
+if __name__ == "__main__":
     try:
         main()
     except Exception as e:

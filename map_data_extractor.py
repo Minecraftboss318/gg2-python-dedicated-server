@@ -183,13 +183,13 @@ def get_image_wallmask(map_image_data, map_name):
         else:
             character = ord(character) - 32
             
-        character = '{0:06b}'.format(character)
+        character = "{0:06b}".format(character)
         image_bin_data += [*character]
         
     width = int(wm_width)
     height = int(wm_height)
     img = generate_wm(width, height, image_bin_data)
-    save_png(img, 'wm_' + map_name)
+    save_png(img, "wm_" + map_name)
     return(img)
 
 
