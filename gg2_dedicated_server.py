@@ -511,16 +511,13 @@ class GameServer:
                             print("Player Character Created")
                             
             time.sleep(0.01)
-            
-        
 
 
 # --------------------------------------------------------------------------
 # --------------END OF DEFINING START OF CODE EXECUTION---------------------
 # --------------------------------------------------------------------------
 # Creates list for players
-player_list = []
-player_list.append(Player(None, 1000, "Host", 2, 0))
+player_list = [Player(None, 1000, "Host", 2, 0)]
 
 
 # Stuff below is setting up packet for registration
