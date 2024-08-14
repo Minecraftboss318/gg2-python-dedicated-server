@@ -10,7 +10,7 @@ Pixel = Tuple[int, int, int]
 RawImage = List[List[Pixel]]
 BLACK_PIXEL: Pixel = (0, 0, 0)
 WHITE_PIXEL: Pixel = (255, 255, 255)
-HEADER = b'\x89PNG\r\n\x1A\n'
+HEADER = b"\x89PNG\r\n\x1A\n"
 
 
 # ------------------------
@@ -37,16 +37,16 @@ def get_checksum(chunk_type: bytes, data: bytes) -> int:
 
 
 def chunk(out: BinaryIO, chunk_type: bytes, data: bytes) -> None:
-    out.write(struct.pack('>I', len(data)))
+    out.write(struct.pack(">I", len(data)))
     out.write(chunk_type)
     out.write(data)
 
     checksum = get_checksum(chunk_type, data)
-    out.write(struct.pack('>I', checksum))
+    out.write(struct.pack(">I", checksum))
 
 
 def make_ihdr(width: int, height: int, bit_depth: int, color_type: int) -> bytes:
-    return struct.pack('>2I5B', width, height, bit_depth, color_type, 0, 0, 0)
+    return struct.pack(">2I5B", width, height, bit_depth, color_type, 0, 0, 0)
 
 
 def encode_data(img: RawImage) -> List[int]:
@@ -85,19 +85,19 @@ def dump_png(out: BinaryIO, img: RawImage) -> None:
     color_type = 2  # pixel is RGB triple
 
     ihdr_data = make_ihdr(width, height, bit_depth, color_type)
-    chunk(out, b'IHDR', ihdr_data)
+    chunk(out, b"IHDR", ihdr_data)
 
     compressed_data = make_idat(img)
-    chunk(out, b'IDAT', data=compressed_data)
+    chunk(out, b"IDAT", data=compressed_data)
 
-    chunk(out, b'IEND', data=b'')
+    chunk(out, b"IEND", data=b"")
 
 
 def save_png(img: RawImage, filename: str) -> None:
-    with open(filename, 'wb') as out:
+    with open(filename, "wb") as out:
         dump_png(out, img)
 
-        
+
 # ------------------------
 # Code to extract entities
 # ------------------------
@@ -189,7 +189,7 @@ def get_image_wallmask(map_image_data, map_name):
     width = int(wm_width)
     height = int(wm_height)
     img = generate_wm(width, height, image_bin_data)
-    save_png(img, "wm_" + map_name)
+    save_png(img, f"wm_{map_name}")
     return(img)
 
 

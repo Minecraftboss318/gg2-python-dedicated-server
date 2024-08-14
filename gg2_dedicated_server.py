@@ -173,7 +173,7 @@ class GameServer:
 
     def add_connection(self, conn, addr):
         self.new_connections.append(conn)
-        print("Connections: " + str(len(self.new_connections) + len(player_list) - 1) + "\n")
+        print(f"Connections: {len(self.new_connections) + len(player_list) - 1)}\n")
 
     def serialize_state(self, update_type, client_player):
         to_send = struct.pack(">B", update_type)
@@ -595,7 +595,7 @@ def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", SERVER_PORT))
         s.listen()
-        print("Listening on port " + str(SERVER_PORT))
+        print(f"Listening on port {SERVER_PORT}")
         while True:
             conn, addr = s.accept()
             print("Accepted connection from", addr)
