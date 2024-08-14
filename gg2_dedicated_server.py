@@ -601,31 +601,35 @@ def main():
             print("Accepted connection from", addr)
             game_server.add_connection(conn, addr)
 
-try:
-    main()
-except Exception as bruh:
-    print("EXCEPTION: " + str(bruh))
-finally:
-    if(USE_UPNP == True):
-        upnp = upnpy.UPnP()
-        # Gets devices
-        devices = upnp.discover()
-        # Gets router I think
-        device = upnp.get_igd()
-        # Gets device services
-        device.get_services()
-        # Sets service
-        service = device['WANIPConn1']
-        # Gets actions for said service
-        service.get_actions()
+def upnp_exit():
+    upnp = upnpy.UPnP()
+    # Gets devices
+    devices = upnp.discover()
+    # Gets router I think
+    device = upnp.get_igd()
+    # Gets device services
+    device.get_services()
+    # Sets service
+    service = device['WANIPConn1']
+    # Gets actions for said service
+    service.get_actions()
 
-        service.DeletePortMapping.get_input_arguments()
-        # Finally, add the new port mapping to the IGD
-        # This specific action returns an empty dict: {}
-        service.DeletePortMapping(
-            NewRemoteHost='',
-            NewExternalPort=SERVER_PORT,
-            NewProtocol='TCP'
-        )
+    service.DeletePortMapping.get_input_arguments()
+    # Finally, add the new port mapping to the IGD
+    # This specific action returns an empty dict: {}
+    service.DeletePortMapping(
+        NewRemoteHost='',
+        NewExternalPort=SERVER_PORT,
+        NewProtocol='TCP'
+    )
+
+if __name__ == "__main":
+    try:
+        main()
+    except Exception as e:
+        print(f"EXCEPTION: {e}")
+    finally:
+        if USE_UPNP:
+            upnp_exit()
+
         exit()
-
