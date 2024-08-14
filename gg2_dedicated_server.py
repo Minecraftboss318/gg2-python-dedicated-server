@@ -70,11 +70,10 @@ def registration(boolean):
         current_map = bytes("ctf_eiger", 'utf-8')
         packet = REG_PACKET_ONE + occupied_slots + num_bots + REG_PACKET_TWO + current_map_key_length + current_map_key + current_map_length + current_map + REG_PACKET_THREE
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
-        sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) #COOLER TCP WAY
-        sock.send(packet)
-        sock.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            #sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
+            sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) #COOLER TCP WAY
+            sock.send(packet)
         print("---Registration Packet Sent---")
         time.sleep(30)
 
@@ -82,10 +81,9 @@ def registration(boolean):
 def upnp_port_mapping():
     while(True):
         #Gets host local ip
-        temp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        temp_sock.connect(("8.8.8.8", 80))
-        HOST_IP = temp_sock.getsockname()[0]
-        temp_sock.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as temp_socket:
+            temp_sock.connect(("8.8.8.8", 80))
+            HOST_IP = temp_sock.getsockname()[0]
 
         #UPNP port forwarding
         upnp = upnpy.UPnP()
@@ -272,9 +270,8 @@ class GameServer:
                 break
             print("Received New Connection Data")
             print(data)
-            f = open("connData.txt", "wb")
-            f.write(data)
-            f.close()
+            with open("connData.txt", "wb") as f:
+                f.write(data)
             if(data[0] == HELLO):
                 print("Received Hello")
                 to_send = struct.pack(">B", 43)
@@ -375,9 +372,8 @@ class GameServer:
             print("Received Player Data")
             print(data[0])
             print(data)
-            f = open("connData2.txt", "wb")
-            f.write(data)
-            f.close()
+            with open("connData2.txt", "wb") as f:
+                f.write(data)
             reading_position = 0;
             while reading_position <= (len(data)-1):
                 if(data[reading_position] == PLAYER_LEAVE):
