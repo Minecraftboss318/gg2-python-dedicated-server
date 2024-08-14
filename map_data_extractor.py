@@ -5,6 +5,7 @@ import zlib
 from PIL import Image
 from typing import BinaryIO, List, Tuple
 
+
 Pixel = Tuple[int, int, int]
 RawImage = List[List[Pixel]]
 BLACK_PIXEL: Pixel = (0, 0, 0)
@@ -28,10 +29,12 @@ def generate_wm(width: int, height: int, wm) -> RawImage:
         out.append(row)
     return out
 
+
 def get_checksum(chunk_type: bytes, data: bytes) -> int:
     checksum = zlib.crc32(chunk_type)
     checksum = zlib.crc32(data, checksum)
     return checksum
+
 
 def chunk(out: BinaryIO, chunk_type: bytes, data: bytes) -> None:
     out.write(struct.pack('>I', len(data)))
@@ -41,8 +44,10 @@ def chunk(out: BinaryIO, chunk_type: bytes, data: bytes) -> None:
     checksum = get_checksum(chunk_type, data)
     out.write(struct.pack('>I', checksum))
 
+
 def make_ihdr(width: int, height: int, bit_depth: int, color_type: int) -> bytes:
     return struct.pack('>2I5B', width, height, bit_depth, color_type, 0, 0, 0)
+
 
 def encode_data(img: RawImage) -> List[int]:
     ret = []
@@ -63,10 +68,12 @@ def compress_data(data: List[int]) -> bytes:
     data_bytes = bytearray(data)
     return zlib.compress(data_bytes)
 
+
 def make_idat(img: RawImage) -> bytes:
     encoded_data = encode_data(img)
     compressed_data = compress_data(encoded_data)
     return compressed_data
+
 
 def dump_png(out: BinaryIO, img: RawImage) -> None:
     out.write(HEADER)  # start by writing the header
@@ -85,6 +92,7 @@ def dump_png(out: BinaryIO, img: RawImage) -> None:
 
     chunk(out, b'IEND', data=b'')
 
+
 def save_png(img: RawImage, filename: str) -> None:
     with open(filename, 'wb') as out:
         dump_png(out, img)
@@ -101,11 +109,13 @@ class LegacyEntity:
         self.y = y
         self.yscale = yscale
 
+
 class Entity:
     def __init__(self, _dict):
         self.xscale = 1
         self.yscale = 1
         self.__dict__.update(_dict)
+
 
 def get_image_entities(map_image_data):
     entity_objects = []

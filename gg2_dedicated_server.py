@@ -7,7 +7,6 @@ import upnpy
 import map_data_extractor
 
 
-
 #--------------------------------------------------------------------------
 #--------------------------------Variables---------------------------------
 #--------------------------------------------------------------------------
@@ -79,6 +78,7 @@ def registration(boolean):
         print("---Registration Packet Sent---")
         time.sleep(30)
 
+
 def upnp_port_mapping():
     while(True):
         #Gets host local ip
@@ -132,6 +132,7 @@ class Player:
         self.queue_jump = 0
         self.respawn_timer = 1
 
+
 class Character:
     def __init__(self, player_object):
         self.player_object = player_object
@@ -150,6 +151,7 @@ class Character:
         
         self.hp = 50
 
+
 class gg2_map:
     def __init__(self, gg2_map_data):
         self.redspawns = []
@@ -164,7 +166,6 @@ class gg2_map:
                 self.redspawns.append(entity)
             elif(entity.type == "bluespawn"):
                 self.bluespawns.append(entity)
-                
         
 
 class GameServer:
@@ -504,9 +505,6 @@ class GameServer:
             self.server_to_send = bytes("", 'utf-8')
             time.sleep(0.01)
 
-
-
-
     def run_game_server(self):
         while True:
             if(1 < len(player_list)):
@@ -575,10 +573,6 @@ PROTOCOL_ID = struct.pack(">16B", 179, 28, 34, 9, 66, 86, 154, 25, 208, 239, 199
 REG_PACKET_THREE += PROTOCOL_ID
 
 
-
-
-
-
 def main():
     #Maps UPNP port if UPNP is enabled
     if(USE_UPNP == True):
@@ -610,8 +604,6 @@ def main():
             conn, addr = s.accept()
             print("Accepted connection from", addr)
             game_server.add_connection(conn, addr)
-
-
 
 try:
     main()
