@@ -16,7 +16,7 @@ HEADER = b"\x89PNG\r\n\x1A\n"
 # ------------------------
 # Code to create png image
 # ------------------------
-def generate_wm(width: int, height: int, wm) -> RawImage:
+def generate_wall_mask_image(width: int, height: int, wm) -> RawImage:
     out = []
     for i in range(height):
         row = []
@@ -147,7 +147,6 @@ def get_image_entities(map_image_data):
         for entity in image_entities:
             print(entity)
             entity_objects.append(Entity(entity))
-                
     else:
         print("Old Entity Format")
         image_entities = map_image_data[entities_start:entities_end]
@@ -176,7 +175,7 @@ def get_image_wallmask(map_image_data, map_name):
         if(image_wm_data[0] == "."):
             image_wm_data = image_wm_data[1:len(image_wm_data)]
             break
-            
+
         wm_width += str(image_wm_data[0])
         image_wm_data = image_wm_data[1:len(image_wm_data)]
 
@@ -185,7 +184,7 @@ def get_image_wallmask(map_image_data, map_name):
         if(image_wm_data[0] == "."):
             image_wm_data = image_wm_data[1:len(image_wm_data)]
             break
-            
+
         wm_height += str(image_wm_data[0])
         image_wm_data = image_wm_data[1:len(image_wm_data)]
 
@@ -201,13 +200,13 @@ def get_image_wallmask(map_image_data, map_name):
             character = 39 - 32
         else:
             character = ord(character) - 32
-            
+
         character = "{0:06b}".format(character)
         image_bin_data += [*character]
-        
+
     width = int(wm_width)
     height = int(wm_height)
-    img = generate_wm(width, height, image_bin_data)
+    img = generate_wall_mask_image(width, height, image_bin_data)
     save_png(img, f"wm_{map_name}")
     return(img)
 
@@ -217,7 +216,7 @@ def extract_map_data(map_name):
     map_image = Image.open(map_name)
     map_image.load()
     map_image_data = str(map_image.info)
-    
+
     map_image_data = map_image_data.replace("\\n", ".")
     entities_start = map_image_data.find("{ENTITIES}")
     entities_end = map_image_data.find(".{END WALKMASK}") + 15

@@ -16,7 +16,6 @@ REG_LOBBY_PORT = 29944
 
 # Server Hosting Port and UPNP toggle
 SERVER_PORT = 8150
-if(SERVER_PORT < 0): exit()
 USE_UPNP = True
 
 # Class Constants
@@ -146,15 +145,15 @@ class Character:
         self.y = 0
         self.hspeed = 0
         self.vspeed = 0
-        
+
         self.key_state = 0
         self.pressed_keys = 0
         self.released_keys = 0
         self.last_key_state = 0
-        
+
         self.aim_direction = 0
         self.aim_distance = 0
-        
+
         self.hp = 50
 
 
@@ -172,7 +171,7 @@ class gg2_map:
                 self.redspawns.append(entity)
             elif(entity.type == "bluespawn"):
                 self.bluespawns.append(entity)
-        
+
 
 class GameServer:
     def __init__(self):
@@ -188,12 +187,12 @@ class GameServer:
 
     def serialize_state(self, update_type, client_player):
         to_send = struct.pack(">B", update_type)
-        
+
         if(update_type == FULL_UPDATE):
             to_send += struct.pack("<H", 30) # >H is the intended one
-            
+
         to_send += struct.pack(">B", len(player_list))
-        
+
         # Writes player stats n stuff
         if(update_type != CAPS_UPDATE):
             for joining_player in player_list:
@@ -215,11 +214,11 @@ class GameServer:
                 for victim in player_list:
                     if(joining_player != victim):
                         to_send += struct.pack(">B", 0)
-                        
+
                 # Subojects except they don't exist yet fully
                 if(client_player.character_object != None):
                     to_send += struct.pack(">B", 1)
-                    
+
                     # NEW
                     to_send += struct.pack(">B", client_player.character_object.key_state)
                     to_send += struct.pack("<H", client_player.character_object.aim_direction)
@@ -232,7 +231,7 @@ class GameServer:
                          to_send += struct.pack(">B", ceil(client_player.character_object.hp))
                          # Temp Values
                          to_send += struct.pack(">B", 1)
-                         
+
                 else:
                     to_send += struct.pack(">B", 0)
 
@@ -304,7 +303,7 @@ class GameServer:
                     print("Incompatible Protocol Received")
                     conn.sendall(to_send)
                     break
-                        
+
             elif(data[0] == RESERVE_SLOT):
                 print("Received Reserve Slot")
                 # Generates player ID for new player
@@ -328,14 +327,14 @@ class GameServer:
                     print("Server Full")
                     conn.sendall(to_send)
                     break
-                        
+
             elif(data[0] == PLAYER_JOIN):
                 print("Received Player Join")
                 # Writes JOIN_UPDATE with num of players and map area
                 to_send = struct.pack(">B", JOIN_UPDATE)
                 to_send += struct.pack(">B", len(player_list))
                 to_send += struct.pack(">B", 1)
-                
+
                 # Writes the current map n stuff
                 to_send += struct.pack(">B", CHANGE_MAP)
                 to_send += struct.pack(">B", 9)
@@ -358,7 +357,7 @@ class GameServer:
                     to_send += struct.pack(">B", joining_player.team)
                 # Writes FULL_UPDATE stuff
                 to_send += self.serialize_state(FULL_UPDATE, client_player)
-                
+
                 player_list.append(client_player)
                 # Server Player Join
                 self.server_to_send += struct.pack(">B", PLAYER_JOIN)
@@ -398,7 +397,7 @@ class GameServer:
                     print("YO")
                     # Updates data reading position
                     reading_position = reading_position + 1
-                    
+
                 elif(data[reading_position] == PLAYER_CHANGETEAM):
                     print("Received Change Team")
                     # Player Death
@@ -418,7 +417,7 @@ class GameServer:
                     self.server_to_send += struct.pack(">B", player_to_service.team)
                     # Updates data reading position
                     reading_position = reading_position + 2
-                    
+
                 elif(data[reading_position] == PLAYER_CHANGECLASS):
                     print("Received Change Class")
                     player_to_service.respawn_timer = 1
@@ -446,7 +445,7 @@ class GameServer:
                         print(player_to_service.character_object.last_key_state)
                     # Updates data reading position
                     reading_position = reading_position + 5
-                        
+
                 else:
                     # self.server_to_send = 0
                     print("Not yet added thing")
@@ -454,10 +453,9 @@ class GameServer:
                     reading_position = reading_position + 1
 
                 # print(str(reading_position) + "|" + str(len(data)-1))
-                
+
             time.sleep(0.1)
-                    
-        
+
         except ConnectionResetError:
             player_list.remove(player_to_service)
             print("Player Socket Disconnect")
@@ -507,7 +505,7 @@ class GameServer:
             # Joins 1 new player each loop
             if(0 < len(self.new_connections)):
                 self.join_player(self.new_connections[0])
-            
+
             # Sends update to all players
             if(0 < len(self.server_to_send)):
                 for player_to_service in player_list:
@@ -527,7 +525,7 @@ class GameServer:
                         if(player_to_service.character_object == None and player_to_service.respawn_timer <= 0 and (player_to_service.team == 0 or player_to_service.team == 1) and (0 <= player_to_service._class and player_to_service._class <= 9)):
                             player_to_service.character_object = Character(player_to_service)
                             print("Player Character Created")
-                            
+
             time.sleep(0.01)
 
 
@@ -733,6 +731,9 @@ def upnp_exit():
     )
 
 if __name__ == "__main__":
+    if SERVER_PORT < 0:
+        exit()
+
     try:
         main()
     except Exception as e:
