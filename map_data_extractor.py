@@ -13,15 +13,15 @@ WHITE_PIXEL: Pixel = (255, 255, 255)
 HEADER = b'\x89PNG\r\n\x1A\n'
 
 
-#------------------------
-#Code to create png image
-#------------------------
+# ------------------------
+# Code to create png image
+# ------------------------
 def generate_wm(width: int, height: int, wm) -> RawImage:
     out = []
     for i in range(height):
         row = []
         for j in range(width):
-            #print((i*width) + j)
+            # print((i*width) + j)
             if int(wm[(i*width) + j]) == 0:
                 row.append(WHITE_PIXEL)
             else:
@@ -98,9 +98,9 @@ def save_png(img: RawImage, filename: str) -> None:
         dump_png(out, img)
 
         
-#------------------------
-#Code to extract entities
-#------------------------
+# ------------------------
+# Code to extract entities
+# ------------------------
 class LegacyEntity:
     def __init__(self, _type, x, xscale, y, yscale):
         self.type = _type
@@ -146,9 +146,9 @@ def get_image_entities(map_image_data):
     return(entity_objects)
 
 
-#------------------------
-#Code to extract wallmask
-#------------------------
+# ------------------------
+# Code to extract wallmask
+# ------------------------
 def get_image_wallmask(map_image_data, map_name):
     image_wm_data = map_image_data[map_image_data.find("{WALKMASK}")+11:map_image_data.find(".{END WALKMASK}")]
 
@@ -193,9 +193,9 @@ def get_image_wallmask(map_image_data, map_name):
     return(img)
 
 
-#Only ever call this to extract embeded image data
+# Only ever call this to extract embeded image data
 def extract_map_data(map_name):
-    #map_image_data = str(subprocess.run(["exiftool.exe", "", map_name], capture_output=True, text=True))
+    # map_image_data = str(subprocess.run(["exiftool.exe", "", map_name], capture_output=True, text=True))
     map_image = Image.open(map_name)
     map_image.load()
     map_image_data = str(map_image.info)
@@ -206,4 +206,4 @@ def extract_map_data(map_name):
     return([get_image_entities(map_image_data), get_image_wallmask(map_image_data, map_name)])
 
 
-#print(extract_map_data("ctf_eiger.png"))
+# print(extract_map_data("ctf_eiger.png"))
