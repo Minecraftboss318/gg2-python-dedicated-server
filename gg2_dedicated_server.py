@@ -216,7 +216,7 @@ class GameServer:
                         to_send += struct.pack(">B", 0)
 
                 # Subojects except they don't exist yet fully
-                if client_player.character_object != None:
+                if client_player.character_object is not None:
                     to_send += struct.pack(">B", 1)
 
                     # NEW
