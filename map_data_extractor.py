@@ -208,7 +208,7 @@ def get_image_wallmask(map_image_data, map_name):
     height = int(wm_height)
     img = generate_wall_mask_image(width, height, image_bin_data)
     save_png(img, f"wm_{map_name}")
-    return(img)
+    return img
 
 
 # Only ever call this to extract embeded image data
