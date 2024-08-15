@@ -706,7 +706,7 @@ def main():
 
 
     # Starts registration loop thread
-    reg_thread = threading.Thread(target = registration, args = (True))
+    reg_thread = threading.Thread(target = registration, args = (True,))
     reg_thread.start()
 
     # Gets map entities and wallmask
@@ -717,7 +717,7 @@ def main():
     game_server = GameServer()
     server_networking_thread = threading.Thread(
         target = GameServer.run_game_server_networking,
-        args = (game_server)
+        args = (game_server,)
     )
     server_networking_thread.start()
 
