@@ -512,8 +512,8 @@ class GameServer:
 
             # Alarm Updating Here
             #if len(player_list) > 1:
-            #    for player_to_service in player_list:
-            #        if player_to_service._id != 1000:
+                for player_to_service in player_list:
+                    if player_to_service._id != 1000:
                         self.process_client_alarms(player_to_service)
 
             # Position/physics object updating here
