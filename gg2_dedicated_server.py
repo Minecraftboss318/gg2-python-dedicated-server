@@ -58,9 +58,8 @@ RESERVE_SLOT = 60
 # --------------------------------Functions---------------------------------
 # --------------------------------------------------------------------------
 # Updates lobby server of server existance
-def registration(boolean):
-    # TODO: WTF DOES BOOLEAN MEAN!??!?!?!
-    while boolean:
+def registration(should_loop):
+    while should_loop:
         # Assembles Packet
         occupied_slots = struct.pack(">H", len(player_list) - 1)
         num_bots = struct.pack(">H", 0)
