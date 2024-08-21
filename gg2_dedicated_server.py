@@ -19,6 +19,12 @@ REG_LOBBY_PORT = 29944
 SERVER_PORT = 8150
 USE_UPNP = True
 
+# Map File
+map_file_path = "ctf_eiger.png"
+
+# Server player name
+host_name = "Host"
+
 # Class Constants
 CLASS_SCOUT = 0
 CLASS_SOLDIER = 1
@@ -191,53 +197,57 @@ class GameServer:
         to_send = struct.pack(">B", update_type)
 
         if update_type == FULL_UPDATE:
-            to_send += struct.pack("<H", 30) # >H is the intended one
+            # tdm invulnerability ticks
+            to_send += struct.pack("<H", 30)
 
         to_send += struct.pack(">B", len(player_list))
 
-        # Writes player stats n stuff show_error(string(),false);
+        # Adds each player's data for update
         if update_type != CAPS_UPDATE:
             for joining_player in player_list:
                 if update_type == FULL_UPDATE:
-                    to_send += struct.pack(">B", joining_player.stats[0])
-                    to_send += struct.pack(">B", joining_player.stats[1])
-                    to_send += struct.pack(">B", joining_player.stats[2])
-                    to_send += struct.pack(">B", joining_player.stats[3])
-                    to_send += struct.pack(">B", joining_player.stats[4])
-                    to_send += struct.pack(">B", joining_player.stats[5])
-                    to_send += struct.pack("<H", joining_player.stats[6])
-                    to_send += struct.pack(">B", joining_player.stats[7])
-                    to_send += struct.pack(">B", joining_player.stats[8])
-                    to_send += struct.pack(">B", joining_player.stats[9])
-                    to_send += struct.pack(">B", joining_player.stats[10])
-                    to_send += struct.pack(">B", 0)
-                    to_send += struct.pack("<H", 0)
-                    to_send += bytes("", "utf-8")
-                    # Dominations except I don't do them
+                    to_send += struct.pack(">B", joining_player.stats[0])  # Kills
+                    to_send += struct.pack(">B", joining_player.stats[1])  # Deaths
+                    to_send += struct.pack(">B", joining_player.stats[2])  # Caps
+                    to_send += struct.pack(">B", joining_player.stats[3])  # Assists
+                    to_send += struct.pack(">B", joining_player.stats[4])  # Destruction
+                    to_send += struct.pack(">B", joining_player.stats[5])  # Stabs
+                    to_send += struct.pack("<H", joining_player.stats[6])  # Healing
+                    to_send += struct.pack(">B", joining_player.stats[7])  # Defenses
+                    to_send += struct.pack(">B", joining_player.stats[8])  # Invulns
+                    to_send += struct.pack(">B", joining_player.stats[9])  # Bonus
+                    to_send += struct.pack(">B", joining_player.stats[10]) # Points
+                    to_send += struct.pack(">B", 0)  # Queue Jump (Temp Value)
+                    to_send += struct.pack("<H", 0)  # Rewards length (Temp Value)
+                    to_send += bytes("", "utf-8")    # Rewards String (Temp Value)
+                    
+                    # Dominations (Temp value)
                     for victim in player_list:
                         if joining_player != victim:
                             to_send += struct.pack(">B", 0)
 
-                # Subojects except they don't exist yet fully
+                # Subojects (Character, Weapon, Sentry)
                 if joining_player.character_object is not None:
+                    # Subobject count
                     to_send += struct.pack(">B", 1)
 
-                    # NEW
+                    # Input & Aiming
                     to_send += struct.pack(">B", joining_player.character_object.key_state)
                     to_send += struct.pack("<H", joining_player.character_object.net_aim_direction)
                     to_send += struct.pack(">B", int(joining_player.character_object.aim_distance/2))
+                    
                     if update_type == QUICK_UPDATE or update_type == FULL_UPDATE:
                         to_send += struct.pack("<H", int(joining_player.character_object.x*5))
                         to_send += struct.pack("<H", int(joining_player.character_object.y*5))
                         to_send += struct.pack(">b", int(joining_player.character_object.hspeed*8.5))
                         to_send += struct.pack(">b", int(joining_player.character_object.vspeed*8.5))
                         to_send += struct.pack(">B", math.ceil(joining_player.character_object.hp))
-                        # Temp Values
-                        to_send += struct.pack(">B", 1)
+                        to_send += struct.pack(">B", 2)  # Ammo Count (Temp Value)
+                        
                         to_send += struct.pack(">B", 0)
                         
                     if update_type == FULL_UPDATE:
-                        #Temp Misc and Intel values
+                        # Temp Misc and Intel values
                         to_send += struct.pack(">B", 0)
                         to_send += struct.pack(">B", 0)
                         
@@ -245,17 +255,17 @@ class GameServer:
                         to_send += struct.pack(">B", 0)
                         to_send += struct.pack("<h", 0)
 
-                        #Temp Weapon Values
+                        # Temp Weapon Values
                         to_send += struct.pack(">B", 0)
                         to_send += struct.pack(">B", 0)
                         
                 else:
+                    # Subobject count
                     to_send += struct.pack(">B", 0)
 
         if update_type == FULL_UPDATE:
             # Red Intel
             to_send += struct.pack("<H", 1)
-            # Multiply 5 because deserilized divide by 5
             to_send += struct.pack("<H", loaded_map.intels[0].x*5)
             to_send += struct.pack("<H", loaded_map.intels[0].y*5)
             to_send += struct.pack("<h", -1)
@@ -264,7 +274,7 @@ class GameServer:
             to_send += struct.pack("<H", loaded_map.intels[1].x*5)
             to_send += struct.pack("<H", loaded_map.intels[1].y*5)
             to_send += struct.pack("<h", -1)
-            # Caps limit and caps and respawn time
+            # Cap limit, red caps, blue caps, server respawn time
             to_send += struct.pack(">B", 3)
             to_send += struct.pack(">B", 0)
             to_send += struct.pack(">B", 0)
@@ -397,23 +407,36 @@ class GameServer:
 
     def process_client_commands(self, player_to_service):
         conn = player_to_service.connection
-        conn.settimeout(0.1)
-        try:
+        conn.settimeout(0)
+        commands_done = 0
+        
+        while 10 > commands_done:
             data = None
-            data = conn.recv(1)
-            if not data:
+            try:
+                data = conn.recv(1)
+            except BlockingIOError:
+                commands_done = 10
+                break
+            except ConnectionResetError:
+                player_list.remove(player_to_service)
+                print("Connection Reset Error")
                 print("Player Socket Disconnect")
-                return 0
+                commands_done = 10
+                break
+            except TimeoutError:
+                print("Timeout?")
+                commands_done = 10
+                break
+            
             # print("Received Player Data")
-            #print(data[0])
-            #print(data)
-            #with open("connData2.txt", "wb") as f:
-            #    f.write(data)
+            # print(data[0])
+            # print(data)
 
             # Reactions to client data
             if data[0] == PLAYER_LEAVE:
                 print("Player Left???")
                 conn.close()
+                player_list.remove(player_to_service)
 
             elif data[0] == PLAYER_CHANGETEAM:
                 print("Received Change Team")
@@ -465,22 +488,12 @@ class GameServer:
                     data = conn.recv(4)
 
             else:
-                # self.server_to_send = 0
                 print("Not yet added thing")
                 print(struct.unpack(">B", data))
                 print(struct.unpack(">b", data))
                 print(data)
-                #data = conn.recv(1)
-                
-
-            # print(str(reading_position) + "|" + str(len(data)-1))
-
-
-        except ConnectionResetError:
-            player_list.remove(player_to_service)
-            print("Player Socket Disconnect")
-        except TimeoutError:
-            pass
+            
+            commands_done += 1
 
     def process_client_alarms(self, player_to_service):
         # Respawn Alarm
@@ -527,30 +540,28 @@ class GameServer:
         frame = 0
         while True:
             start_time = time.time()
-            
-            if run_virtual_ticks:
-                frame = frame + 1
-                
+            frame = frame + 1
+
             if len(player_list) > 1:
-                # Processes client commands
+                # Processes player/client commands
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
                         self.process_client_commands(player_to_service)
 
+                # Send players server update
                 if (frame % 7) == 0:
                     self.server_to_send += self.serialize_state(QUICK_UPDATE)
                 else:
                     self.server_to_send += self.serialize_state(INPUTSTATE)
                     
-
-                # Alarm Updating Here
+                # Alarm Updating
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
                         self.process_client_alarms(player_to_service)
 
                 # Position/physics object updating here
 
-            # Joins 1 new player each loop
+            # Joins one new player each loop
             if self.new_connections:
                 self.join_player(self.new_connections[0])
 
@@ -558,35 +569,32 @@ class GameServer:
             if self.server_to_send:
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
-                        conn = player_to_service.connection
-                        conn.sendall(self.server_to_send)
-
+                        try:
+                            conn = player_to_service.connection
+                            conn.sendall(self.server_to_send)
+                        except ConnectionResetError:
+                            player_list.remove(player_to_service)
+                            print("Connection Reset Error")
+                            print("Player Socket Disconnect")
+                        except BlockingIOError:
+                            pass
+                        except TimeoutError:
+                            print("Server Send Timeout")
+                        
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
+            compute_time = time.time() - start_time
+            if(compute_time < 0.02):
+                time.sleep(0.02 - compute_time)
             
-            #time_to_wait = 0.025 - (time.time() - start_time)
-            #if time_to_wait >= 0:
-            #time.sleep(0.5)
-            
-            #time.sleep(0.01)
 
-
-class GameTicksHandler:
-    def update_ticks(self):
-        ticks = 0
-        
-        while True:
-            global run_virtual_ticks
-            run_virtual_ticks = (ticks < 1)
-            ticks = (ticks + 1) % 1
-        
 
 
 # --------------------------------------------------------------------------
 # --------------END OF DEFINING START OF CODE EXECUTION---------------------
 # --------------------------------------------------------------------------
 # Creates list for players
-player_list = [Player(None, 1000, "Host", 2, 0)]
+player_list = [Player(None, 1000, host_name, 2, 0)]
 
 
 # Stuff below is setting up packet for registration
@@ -744,20 +752,9 @@ def main():
 
     # Gets map entities and wallmask
     global loaded_map
-    loaded_map = GG2Map(map_data_extractor.extract_map_data("ctf_eiger.png"))
+    loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_path))
 
     time.sleep(0.1)
-    # Start tick handling
-    global run_virtual_ticks
-    run_virtual_ticks = True
-    
-    #tick_handler = GameTicksHandler()
-    #game_tick_handling_thread = threading.Thread(
-    #    target = GameTicksHandler.update_ticks,
-    #    args = (tick_handler,)
-    #)
-    #game_tick_handling_thread.start()
-    
     # Start Game Server
     game_server = GameServer()
     server_networking_thread = threading.Thread(
