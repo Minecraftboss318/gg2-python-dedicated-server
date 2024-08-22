@@ -424,7 +424,7 @@ class GameServer:
                 commands_done = 10
                 break
             except TimeoutError:
-                print("Timeout?")
+                print("Client Receive Timeout?")
                 commands_done = 10
                 break
             
@@ -540,6 +540,11 @@ class GameServer:
         frame = 0
         while True:
             start_time = time.time()
+
+            # Joins one new player each loop
+            if self.new_connections:
+                self.join_player(self.new_connections[0])
+
             frame = frame + 1
 
             if len(player_list) > 1:
@@ -561,9 +566,6 @@ class GameServer:
 
                 # Position/physics object updating here
 
-            # Joins one new player each loop
-            if self.new_connections:
-                self.join_player(self.new_connections[0])
 
             # Sends update to all players
             if self.server_to_send:
@@ -579,14 +581,13 @@ class GameServer:
                         except BlockingIOError:
                             pass
                         except TimeoutError:
-                            print("Server Send Timeout")
+                            print("Server Send Timeout?")
                         
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
             compute_time = time.time() - start_time
             if(compute_time < 0.02):
                 time.sleep(0.02 - compute_time)
-            
 
 
 
