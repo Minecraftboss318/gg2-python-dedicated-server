@@ -128,10 +128,41 @@ def upnp_port_mapping():
         time.sleep(135)
 
 
+def hex_as_int(input_value):
+    return int(hex(input_value), 16)
+
+def num_to_bool(input_num):
+    if input_num > 0.5:
+        return True
+    else:
+        return False
+
+def sign(input_num):
+    if input_num < 0:
+        return -1
+    elif 0 < input_num:
+        return 1
+    else:
+        return 0
+
+def point_direction(x1, y1, x2, y2):
+    return math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360
+
+def degtorad(degrees):
+    return degrees * math.pi / 180
+
+
 # --------------------------------------------------------------------------
 # ----------------------------------Classes---------------------------------
 # --------------------------------------------------------------------------
-# Player Class
+class characterMask:
+    def __init__(self, xPos1, yPos1, width, height):
+        self.x1 = xPos1
+        self.y1 = yPos1
+        self.width = width
+        self.height = height
+
+
 class Player:
     def __init__(self, connection, _id, name, team, _class):
         self.character_object = None
@@ -152,21 +183,310 @@ class Character:
         self.y = 0
         self.hspeed = 0
         self.vspeed = 0
+        self.applied_gravity = 0
 
-        self.key_state = 0
-        self.pressed_keys = 0
-        self.released_keys = 0
-        self.last_key_state = 0
+        self.key_state = 0x0
+        self.pressed_keys = 0x0
+        self.released_keys = 0x0
+        self.last_key_state = 0x0
+        self.move_status = 0x0
 
         self.net_aim_direction = 0
         self.aim_direction = 0
         self.aim_distance = 0
 
+        self.humiliated = False
+        self.taunting = False
+        self.omnomnomnom = False
+
         self.hp = 50
+
+    def place_free(self, xPos, yPos): # [characterMask(-6, -10, 12, 33)]
+        collisions = []
+        rect2_x = xPos + class_masks[0].x1
+        rect2_y = yPos + class_masks[0].y1
+        rect2_width = class_masks[0].width
+        rect2_height = class_masks[0].height
+        
+        for rect1 in loaded_map.wm_collision_rects:
+            if (rect1.x < rect2_x + rect2_width and
+                    rect1.x + rect1.width > rect2_x and
+                    rect1.y < rect2_y + rect2_height and
+                    rect1.y + rect1.height > rect2_y):
+                collisions.append(rect1)
+        if(len(collisions) > 0):
+            return False
+        else:
+            return True
+
+    def move_outside_solid(self, direction, max_dist):
+        if direction == 0:
+            self.x += max_dist
+        elif direction == 90:
+            self.y -= max_dist
+        elif direction == 180:
+            self.x -= max_dist
+        elif direction == 270:
+            self.y += max_dist
+
+    def good_move_contact_solid(self, arg0, arg1):
+        if arg0 <= 0:
+            return 0;
+
+        MAX_I = 8
+        i = 8
+        max_distance = arg1
+        hvec = math.cos(degtorad(arg0)) * max_distance
+        vvec = -math.sin(degtorad(arg0)) * max_distance
+        sfac = max(abs(hvec), abs(vvec))
+        total_moved = 0
+        last_collision_happened = False
+
+        while total_moved < max_distance and i > 0:
+            move_x = hvec/sfac * i/MAX_I * min(1, max_distance - total_moved)
+            move_y = vvec/sfac * i/MAX_I * min(1, max_distance - total_moved)
+
+            new_x = self.x + move_x*i/MAX_I
+            new_y = self.y + move_y*i/MAX_I
+            if self.place_free(new_x, new_y):
+                total_moved += math.dist([self.x, self.y], [new_x, new_y])
+                self.x = new_x
+                self.y = new_y
+                if i < MAX_I:
+                    break
+            else:
+                last_collision_happened = True
+                i -= 1
+
+        return total_moved
+
+    def character_hit_obstacle(self):
+        old_x = self.x
+        old_y = self.y
+        old_hspeed = self.hspeed
+        old_vspeed = self.vspeed
+        bbox_height = class_masks[0].height
+        bbox_width = class_masks[0].width
+
+        if not self.place_free(self.x, self.y):
+            self.move_outside_solid(90, bbox_height/2)
+            distu = old_y - self.y
+            uy = self.y
+            self.y = old_y
+            
+            self.move_outside_solid(270, bbox_height/2)
+            distd = self.y - old_y
+            dy = self.y
+            self.y = old_y
+            
+            self.move_outside_solid(0, bbox_width/2)
+            distr = self.x - old_x
+            rx = self.x
+            self.x = old_x
+            
+            self.move_outside_solid(180, bbox_width/2)
+            distl = old_x - self.x
+            lx = self.x
+            self.x = old_x
+
+            if distu < distd and distu < distr and distu < distl:
+                self.y = uy
+            elif distd < distr and distd < distl:
+                self.y = dy
+            elif distr < distl:
+                self.x = rx
+            else:
+                self.x = lx
+            
+            if not self.place_free(self.x, self.y):
+                self.x = old_x
+                self.y = old_y
+
+        hleft = self.hspeed
+        vleft = self.vspeed
+        loop_counter = 0
+        stuck = 0
+        while (abs(hleft) > 0.1 or abs(vleft) > 0.1) and stuck == 0:
+            loop_counter += 1
+            if loop_counter > 10:
+                stuck = 1
+
+            collision_rectified = False
+            prev_x = self.x
+            prev_y = self.y
+            
+            self.good_move_contact_solid(point_direction(self.x, self.y, self.x + hleft, self.y + vleft), math.dist([self.x, self.y], [self.x + hleft, self.y + vleft]))
+
+            hleft -= self.x - prev_x
+            vleft -= self.y - prev_y
+
+            if vleft != 0 and not self.place_free(self.x, self.y + sign(vleft)):
+                if vleft > 0:
+                    self.move_status = 0
+                vleft = 0
+                self.vspeed = 0
+                collision_rectified = True
+
+            if hleft != 0 and not self.place_free(self.x + sign(hleft), self.y):
+                if self.place_free(self.x + sign(hleft), self.y - 6):
+                    self.y -= 6
+                    collision_rectified = True
+                    self.move_status = 0
+                elif self.place_free(self.x + sign(hleft), self.y + 6) and abs(self.hspeed) >= abs(self.vspeed):
+                    self.y += 6
+                    collision_rectified = True
+                    self.move_status = 0
+                else:
+                    hleft = 0
+                    self.hspeed = 0
+                    collision_rectified = True
+            if not collision_rectified and (abs(hleft) >= 1 or abs(vleft) >= 1):
+                self.vspeed = 0
+                vleft = 0
+
+            self.hspeed /= 1
+            self.vspeed /= 1
+
+
+    def begin_step(self):
+        stuck_in_wall = not self.place_free(self.x, self.y)
+        obstacle_below = not self.place_free(self.x, self.y+1);
+        on_ground = False
+        on_non_surfing_ground = False
+
+        if self.vspeed >= 0:
+            if obstacle_below:
+                on_ground = True
+                on_non_surfing_ground = True
+            elif not (int(hex(self.key_state), 16) & 0x02):
+                # I ain't adding dropdowns soon
+                pass
+
+        if on_non_surfing_ground:
+            self.move_status = 0
+        if on_ground:
+            double_jump_used = 0;
+
+        # Afterburn here
+
+        # Input Handling
+        if False:
+            if num_to_bool(hex_as_int(self.pressed_keys) & 0x80):
+                want_to_jump = True
+            elif num_to_bool(hex_as_int(self.released_keys) & 0x80):
+                want_to_jump = False
+
+        if not self.taunting and not self.omnomnomnom:
+            if not self.humiliated and num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x10):
+                # Weapon fire here
+                pass
+            if not self.humiliated and self.pressed_keys & 0x01:
+                # Taunting Stuff
+                if False:
+                    pass
+
+            if ((num_to_bool(hex_as_int(self.pressed_keys) & 0x80)) or (False and want_to_jump)) and self.vspeed > -8.3:
+                if on_ground and not stuck_in_wall:
+                    if True:
+                        want_to_jump = False
+                        self.vspeed = -8.3
+                        on_ground = False
+                        print("done jump")
+            elif False and not double_jump_used:
+                want_to_jump = False
+                self.vspeed = -8.3
+                on_ground = false;
+                move_status = 0;
+
+        # Move Status stuff
+
+        # Horizonal Movement
+        controlling = False
+        for x in range(2):
+            if not self.taunting and not self.omnomnomnom:
+                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x40) and self.hspeed >= -(1.4 * 0.85 / (1.15-1)):
+                    self.hspeed -= 1.4*0.85 * 0.5;
+                    controlling = True;
+                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x20) and self.hspeed <= 1.4 * 0.85 / (1.15-1):
+                    self.hspeed += 1.4*0.85 * 0.5;
+                    controlling = not controlling;
+
+        # Stuff in between to implement
+
+        if abs(self.hspeed) > (1.4 * 0.85 / (1.15-1)) * 2 or (num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x60) and abs(self.hspeed) < (1.4 * 0.85 / (1.15-1))):
+            self.hspeed /= (1.15 * 0.5 + (1-1*0.5))
+        else:
+            self.hspeed /= (1.15 * 0.5 + (1-1*0.5))
+
+        self.pressed_keys = 0
+        self.released_keys = 0
+
+        # Stop "ice skating"
+        if abs(self.hspeed) < 0.195 and not controlling:
+            self.hspeed = 0
+
+
+        if not on_ground and not stuck_in_wall:
+            if False:
+                self.applied_gravity += 0.54
+            else:
+                self.applied_gravity += 0.6
+
+    def normal_step(self):
+        self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
+        self.vspeed = min(abs(self.vspeed), 15) * sign(self.vspeed)
+
+        #print("X: " + str(self.hspeed))
+        #print("Y: " + str(self.vspeed))
+
+        # Spin jumping here
+
+        # Move status here
+
+        # Gravity
+        self.vspeed += self.applied_gravity*0.5
+        if self.vspeed > 10:
+            self.vspeed = 10
+
+        y_previous = self.y
+        x_previous = self.x
+
+        doHit = not self.place_free(self.x + self.hspeed, self.y + self.vspeed)
+        #print("X: " + str(self.x + self.hspeed))
+        #print("Y: " + str(self.y + self.vspeed))
+        if doHit:
+            self.character_hit_obstacle()
+        else:
+            self.x += self.hspeed
+            self.y += self.vspeed
+
+        # Fallback?
+        if self.place_free(self.x, self.y + 1):
+            self.vspeed += self.applied_gravity*0.5
+        if self.vspeed > 10:
+            self.vspeed = 10
+        self.applied_gravity = 0
+
+        # Dropdown platforms? Never heard of them
+
+        #self.x -= self.hspeed
+        #self.y -= self.vspeed
+
+        self.x += self.hspeed
+        self.y += self.vspeed
+
+        #if self.hspeed != 0:
+        #    print("HSPEED: " + str(self.hspeed))
+        #if self.vspeed != 0:
+        #    print("VSPEED: " + str(self.vspeed))
 
 
 class GG2Map:
     def __init__(self, gg2_map_data):
+        # Wallmask rectangles for collision checking
+        self.wm_collision_rects = gg2_map_data[1]
+
+        # GG2 map's collision entities
         self.redspawns = []
         self.bluespawns = []
         self.intels = [None, None]
@@ -244,7 +564,7 @@ class GameServer:
                         to_send += struct.pack(">B", math.ceil(joining_player.character_object.hp))
                         to_send += struct.pack(">B", 2)  # Ammo Count (Temp Value)
                         
-                        to_send += struct.pack(">B", 0)
+                        to_send += struct.pack(">B", ((joining_player.character_object.move_status & 0x7) << 1))
                         
                     if update_type == FULL_UPDATE:
                         # Temp Misc and Intel values
@@ -424,7 +744,7 @@ class GameServer:
                 commands_done = 10
                 break
             except TimeoutError:
-                print("Client Receive Timeout?")
+                print("Timeout?")
                 commands_done = 10
                 break
             
@@ -541,13 +861,21 @@ class GameServer:
         while True:
             start_time = time.time()
 
+            if len(player_list) > 1:
+                # Begin step collisions
+                for player_to_service in player_list:
+                    if player_to_service._id != 1000:
+                        if player_to_service.character_object is not None:
+                            player_to_service.character_object.begin_step()
+            
+
             # Joins one new player each loop
             if self.new_connections:
                 self.join_player(self.new_connections[0])
 
-            frame = frame + 1
-
             if len(player_list) > 1:
+                frame = frame + 1
+                
                 # Processes player/client commands
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
@@ -565,7 +893,10 @@ class GameServer:
                         self.process_client_alarms(player_to_service)
 
                 # Position/physics object updating here
-
+                for player_to_service in player_list:
+                    if player_to_service._id != 1000:
+                        if player_to_service.character_object is not None:
+                            player_to_service.character_object.normal_step()
 
             # Sends update to all players
             if self.server_to_send:
@@ -581,13 +912,14 @@ class GameServer:
                         except BlockingIOError:
                             pass
                         except TimeoutError:
-                            print("Server Send Timeout?")
+                            print("Server Send Timeout")
                         
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
             compute_time = time.time() - start_time
-            if(compute_time < 0.02):
-                time.sleep(0.02 - compute_time)
+            if(compute_time < 0.0333):
+                time.sleep(0.0333 - compute_time)
+            
 
 
 
@@ -596,6 +928,9 @@ class GameServer:
 # --------------------------------------------------------------------------
 # Creates list for players
 player_list = [Player(None, 1000, host_name, 2, 0)]
+
+# Creates class collision boxes
+class_masks = [characterMask(-6, -10, 12, 33)] #33
 
 
 # Stuff below is setting up packet for registration
