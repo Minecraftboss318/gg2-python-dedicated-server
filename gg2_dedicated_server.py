@@ -155,7 +155,7 @@ def degtorad(degrees):
 # --------------------------------------------------------------------------
 # ----------------------------------Classes---------------------------------
 # --------------------------------------------------------------------------
-class characterMask:
+class objectMask:
     def __init__(self, xPos1, yPos1, width, height):
         self.x1 = xPos1
         self.y1 = yPos1
@@ -165,14 +165,40 @@ class characterMask:
 
 class Player:
     def __init__(self, connection, _id, name, team, _class):
-        self.character_object = None
-        self.connection = connection
         self._id = _id
-        self.name = name
+        
+        self.character_object = None
         self.team = team
         self._class = _class
-        self.stats = [0]*11
-        self.queue_jump = 0
+        self.connection = connection
+        self.name = name
+        self.kicked = False
+
+        self.queue_jump = False
+        
+        # Stat tracking array
+        self.stats = [0]*13
+
+        # Statistic array for single life/arena
+        self.round_stats = [0]*13
+
+        self.times_changed_cap_limit = 0
+
+        self.last_known_x = 0
+        self.last_known_y = 0
+
+        self.humiliated = 0
+
+        self.deathmatch_respawn_bypass = 0
+
+        # Sentries for Engies
+        self.sentry = None
+
+        # Domination Kill Table
+        self.domination_kills = []
+    
+        self.corpse = None
+
         self.respawn_timer = 1
 
 
@@ -183,30 +209,123 @@ class Character:
         self.y = 0
         self.hspeed = 0
         self.vspeed = 0
+
+        # Default character values
+        self.can_double_jump = 0
+        self.can_cloak = 0
+        self.can_build = 0
+        self.base_jump_strength = 8+(0.6/2)
+        self.jump_strength = self.base_jump_strength
+        self.cap_strength = 1
+
+        # For frame independent jumping arcs
         self.applied_gravity = 0
 
+        # Setting more values to default
+        self.hp = self.max_hp
+        self.flame_count = 0
+        self.invisible = False
+        self.intel = False
+        self.taunting = False
+        self.double_jump_used = 0
+        self.ubered = 0
+        self.stabbing = 0
+        self.on_cabinet = 0
+        self.want_to_jump = False
+        self.time_unscathed = 0
+        self.sync_wrongness = 0
+
+        # Animation state
+        self.equipment_offset = 0
+        self.onground = True
+        self.still = True
+        self.y_offset = 0
+
+        # Afterburn stuff
+        self.burn_intensity = 0  # "heat"
+        self.leg_intensity = 7  # afterburn intensity after which additional intsity additions are halved.
+        self.max_intensity = 13  # maximum afterburn intensity in DPS
+        self.burn_duration = 0  # "fuel"
+        self.max_duration = 210  # maximum afterburn length in duration ticks (see durationDecay)
+        self.decay_delay = 90  # time between last ignition and intensity lowering
+        self.decay_duration = 90  # time between intensity lowering and zeroing out
+        self.duration_decay = 1  # amount that duration lowers per step
+        self.intensity_decay = self.burn_intensity / self.decay_duration
+        self.burned_by = -1
+        self.afterburn_source = -1
+        self.num_flames = 5  # purely cosmetic - the number of flames that someone has with max burnIntensity
+        self.real_num_flames = self.num_flames
+
+        # Controls
         self.key_state = 0x0
+        self.last_key_state = 0x0
         self.pressed_keys = 0x0
         self.released_keys = 0x0
-        self.last_key_state = 0x0
-        self.move_status = 0x0
-
-        self.net_aim_direction = 0
         self.aim_direction = 0
+        self.net_aim_direction = 0
         self.aim_distance = 0
 
-        self.humiliated = False
-        self.taunting = False
+        # Spinjumping state var
+        self.spin_jumping = False
+
+        # Kill assist/finish off addition
+        self.last_damage_dealer = None
+        self.last_damage_source = -1
+        self.second_to_last_damage_dealer = None
+
+        self.afk = False
+
+        # Cloak for Spies
+        self.cloak = False
+        self.cloak_alpha = 1
+        self.cloak_flicker = False
+
+        # Healer
+        self.healer = -1
+
+        # can_grab_intel- used for droppan intel
+        self.can_grab_intel = True
+        #alarm[1] = 0
+        self.intel_recharge = 0
+    
+        # Control Point
+        self.capping_point = None
+
+        # Sandvich
         self.omnomnomnom = False
+        self.can_eat = True
+        self.eat_cooldown = 1350  # 45 sec cooldown
 
-        self.hp = 50
+        # Sniper zoom
+        self.zoomed = 0
+    
+        # nuts n bolts for contructor
+        self.nuts_n_bolts = 100
+        self.max_nuts_n_bolts = 100
+    
+        # jugglin'
+        # 1 for rocket jump
+        # 2 for rocket juggle
+        # 3 for getting air blasted
+        # 4 for friendly juggles!
+        self.move_status = 0x0
 
-    def place_free(self, xPos, yPos): # [characterMask(-6, -10, 12, 33)]
+        self.base_control = 0.85
+        # Warning that baseFriction cannot be equal to 0 nor 1 or div0 will occur
+        self.base_friction = 1.15
+        self.control_factor = self.base_control
+        self.friction_factor = self.base_friction
+        self.run_power = self.base_run_power
+        self.base_max_speed = abs(self.base_run_power * self.base_control / (self.base_friction-1))
+        self.highest_base_max_speed = 9.735  # Approximation error < 0.0017 of scout's base max speed
+
+
+    def place_free(self, xPos, yPos):
         collisions = []
-        rect2_x = xPos + class_masks[0].x1
-        rect2_y = yPos + class_masks[0].y1
-        rect2_width = class_masks[0].width
-        rect2_height = class_masks[0].height
+        rect2_x = xPos + self.character_mask.x1
+        rect2_y = yPos + self.character_mask.y1
+        rect2_width = self.character_mask.width
+        rect2_height = self.character_mask.height
         
         for rect1 in loaded_map.wm_collision_rects:
             if (rect1.x < rect2_x + rect2_width and
@@ -265,8 +384,8 @@ class Character:
         old_y = self.y
         old_hspeed = self.hspeed
         old_vspeed = self.vspeed
-        bbox_height = class_masks[0].height
-        bbox_width = class_masks[0].width
+        bbox_height = self.character_mask.height
+        bbox_width = self.character_mask.width
 
         if not self.place_free(self.x, self.y):
             self.move_outside_solid(90, bbox_height/2)
@@ -377,10 +496,10 @@ class Character:
                 want_to_jump = False
 
         if not self.taunting and not self.omnomnomnom:
-            if not self.humiliated and num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x10):
+            if not self.player_object.humiliated and num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x10):
                 # Weapon fire here
                 pass
-            if not self.humiliated and self.pressed_keys & 0x01:
+            if not self.player_object.humiliated and self.pressed_keys & 0x01:
                 # Taunting Stuff
                 if False:
                     pass
@@ -481,6 +600,131 @@ class Character:
         #    print("VSPEED: " + str(self.vspeed))
 
 
+class Scout(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1.4
+        self.max_hp = 100
+        self.weapons = ["Scattergun"]  # Temp Value
+        self.haxxy_statue = "ScoutHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.cap_strength = 2
+        self.can_double_jump = 1
+        self.num_flames = 3
+
+
+class Soldier(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 0.9
+        self.max_hp = 160
+        self.weapons = ["Rocketlauncher"]  # Temp Value
+        self.haxxy_statue = "SoldierHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 4
+
+
+class Sniper(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 0.9
+        self.max_hp = 120
+        self.weapons = ["Rifle"]  # Temp Value
+        self.haxxy_statue = "SniperHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 4
+
+
+class Demoman(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1
+        self.max_hp = 120
+        self.weapons = ["Minegun"]  # Temp Value
+        self.haxxy_statue = "DemomanHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 3
+
+
+class Medic(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1.09
+        self.max_hp = 120
+        self.weapons = ["Medigun"]  # Temp Value
+        self.haxxy_statue = "MedicHaxxyStatueS"  # Temp Value
+        # Not Implemented Alarm value here <-
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 4
+
+
+class Engineer(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1
+        self.max_hp = 120
+        self.weapons = ["Shotgun"]  # Temp Value
+        self.haxxy_statue = "EngineerHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 3
+
+
+class Heavy(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 0.8
+        self.max_hp = 200
+        self.weapons = ["Minigun"]  # Temp Value
+        self.haxxy_statue = "HeavyHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 5
+
+
+class Spy(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1.08
+        self.max_hp = 100
+        self.weapons = ["Revolver"]  # Temp Value
+        self.haxxy_statue = "SpyHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.can_cloak = 1
+        self.num_flames = 4
+
+
+class Pyro(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1.1
+        self.max_hp = 120
+        self.weapons = ["Flamethrower"]  # Temp Value
+        self.haxxy_statue = "PyroHaxxyStatueS"  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 3
+        self.max_duration = 10
+
+
+class Quote(Character):
+    def __init__(self, player_object):
+        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.base_run_power = 1.07
+        self.max_hp = 140
+        self.weapons = ["Blade"]  # Temp Value
+        self.haxxy_statue = ""  # Temp Value
+        super().__init__(player_object)
+        # Override defaults
+        self.num_flames = 3
+
+
 class GG2Map:
     def __init__(self, gg2_map_data):
         # Wallmask rectangles for collision checking
@@ -536,7 +780,7 @@ class GameServer:
                     to_send += struct.pack(">B", joining_player.stats[7])  # Defenses
                     to_send += struct.pack(">B", joining_player.stats[8])  # Invulns
                     to_send += struct.pack(">B", joining_player.stats[9])  # Bonus
-                    to_send += struct.pack(">B", joining_player.stats[10]) # Points
+                    to_send += struct.pack(">B", joining_player.stats[12]) # Points
                     to_send += struct.pack(">B", 0)  # Queue Jump (Temp Value)
                     to_send += struct.pack("<H", 0)  # Rewards length (Temp Value)
                     to_send += bytes("", "utf-8")    # Rewards String (Temp Value)
@@ -826,12 +1070,33 @@ class GameServer:
                      and player_to_service._class <= 9)):
             print(player_to_service.team);
             # Player Spawning
-            player_to_service.character_object = Character(player_to_service)
+            if player_to_service._class == 0:
+                player_to_service.character_object = Scout(player_to_service)
+            elif player_to_service._class == 1:
+                player_to_service.character_object = Soldier(player_to_service)
+            elif player_to_service._class == 2:
+                player_to_service.character_object = Sniper(player_to_service)
+            elif player_to_service._class == 3:
+                player_to_service.character_object = Demoman(player_to_service)
+            elif player_to_service._class == 4:
+                player_to_service.character_object = Medic(player_to_service)
+            elif player_to_service._class == 5:
+                player_to_service.character_object = Engineer(player_to_service)
+            elif player_to_service._class == 6:
+                player_to_service.character_object = Heavy(player_to_service)
+            elif player_to_service._class == 7:
+                player_to_service.character_object = Spy(player_to_service)
+            elif player_to_service._class == 8:
+                player_to_service.character_object = Pyro(player_to_service)
+            elif player_to_service._class == 9:
+                player_to_service.character_object = Quote(player_to_service)
+            
             self.server_to_send += struct.pack(">B", PLAYER_SPAWN)
             self.server_to_send += struct.pack(
                 ">B",
                 player_list.index(player_to_service),
             )
+            
             if player_to_service.team == 0:
                 random_spawn = random.randint(0, len(loaded_map.redspawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
@@ -928,9 +1193,6 @@ class GameServer:
 # --------------------------------------------------------------------------
 # Creates list for players
 player_list = [Player(None, 1000, host_name, 2, 0)]
-
-# Creates class collision boxes
-class_masks = [characterMask(-6, -10, 12, 33)] #33
 
 
 # Stuff below is setting up packet for registration
