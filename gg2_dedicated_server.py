@@ -60,6 +60,12 @@ MESSAGE_STRING = 53
 
 RESERVE_SLOT = 60
 
+#Frame/Tick Variables
+delta_factor = 1
+skip_delta_factor = 1/2
+ticks_per_virtual = 1
+frameskip = 2
+room_speed = 30
 
 # --------------------------------------------------------------------------
 # --------------------------------Functions---------------------------------
@@ -308,7 +314,7 @@ class Character:
         # 2 for rocket juggle
         # 3 for getting air blasted
         # 4 for friendly juggles!
-        self.move_status = 0x0
+        self.move_status = 0
 
         self.base_control = 0.85
         # Warning that baseFriction cannot be equal to 0 nor 1 or div0 will occur
@@ -349,6 +355,7 @@ class Character:
             self.y += max_dist
 
     def good_move_contact_solid(self, arg0, arg1):
+        # Function from GG2
         if arg0 <= 0:
             return 0;
 
@@ -380,6 +387,9 @@ class Character:
         return total_moved
 
     def character_hit_obstacle(self):
+        self.hspeed *= delta_factor
+        self.vspeed *= delta_factor
+        
         old_x = self.x
         old_y = self.y
         old_hspeed = self.hspeed
@@ -463,13 +473,13 @@ class Character:
                 self.vspeed = 0
                 vleft = 0
 
-            self.hspeed /= 1
-            self.vspeed /= 1
+            self.hspeed /= delta_factor
+            self.vspeed /= delta_factor
 
 
     def begin_step(self):
         stuck_in_wall = not self.place_free(self.x, self.y)
-        obstacle_below = not self.place_free(self.x, self.y+1);
+        obstacle_below = not self.place_free(self.x, self.y+1)
         on_ground = False
         on_non_surfing_ground = False
 
@@ -477,14 +487,14 @@ class Character:
             if obstacle_below:
                 on_ground = True
                 on_non_surfing_ground = True
-            elif not (int(hex(self.key_state), 16) & 0x02):
+            elif not num_to_bool(hex_as_int(self.key_state) & 0x02):
                 # I ain't adding dropdowns soon
                 pass
 
         if on_non_surfing_ground:
             self.move_status = 0
         if on_ground:
-            double_jump_used = 0;
+            self.double_jump_used = 0;
 
         # Afterburn here
 
@@ -504,46 +514,66 @@ class Character:
                 if False:
                     pass
 
-            if ((num_to_bool(hex_as_int(self.pressed_keys) & 0x80)) or (False and want_to_jump)) and self.vspeed > -8.3:
+            if ((num_to_bool(hex_as_int(self.pressed_keys) & 0x80)) or (False and want_to_jump)) and self.vspeed > -self.jump_strength:
                 if on_ground and not stuck_in_wall:
                     if True:
+                        # Jumping
                         want_to_jump = False
-                        self.vspeed = -8.3
+                        self.vspeed = -self.jump_strength
                         on_ground = False
-                        print("done jump")
-            elif False and not double_jump_used:
-                want_to_jump = False
-                self.vspeed = -8.3
-                on_ground = false;
-                move_status = 0;
+                elif self.can_double_jump and not self.double_jump_used:
+                    # Double Jumping
+                    want_to_jump = False
+                    self.vspeed = -self.jump_strength
+                    on_ground = False;
+                    self.double_jump_used = 1
+                    self.move_status = 0;
 
-        # Move Status stuff
+        # Friction based on move status
+        if self.move_status == 1:
+            self.control_factor = 0.65
+            self.friction_factor = 1
+        elif self.move_status == 2:
+            self.control_factor = 0.45
+            self.friction_factor = 1.05
+        elif self.move_status == 3:
+            self.control_factor = 0.35
+            self.friction_factor = 1.05
+        elif self.move_status == 4:
+            self.control_factor = self.base_control
+            self.friction_factor = 1
+        else:
+            if self.player_object.humiliated:
+                self.control_factor = self.base_control - 0.2
+            elif self.intel:
+                self.control_factor = self.base_control - 0.1
+            else:
+                self.control_factor = self.base_control
+            self.friction_factor = self.base_friction
 
         # Horizonal Movement
         controlling = False
-        for x in range(2):
+        for x in range(frameskip):
             if not self.taunting and not self.omnomnomnom:
-                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x40) and self.hspeed >= -(1.4 * 0.85 / (1.15-1)):
-                    self.hspeed -= 1.4*0.85 * 0.5;
+                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x40) and self.hspeed >= -self.base_max_speed:
+                    self.hspeed -= self.run_power * self.control_factor * skip_delta_factor
                     controlling = True;
-                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x20) and self.hspeed <= 1.4 * 0.85 / (1.15-1):
-                    self.hspeed += 1.4*0.85 * 0.5;
+                if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x20) and self.hspeed <= self.base_max_speed:
+                    self.hspeed += self.run_power * self.control_factor * skip_delta_factor
                     controlling = not controlling;
 
-        # Stuff in between to implement
+            if abs(self.hspeed) > self.base_max_speed * 2 or (num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x60) and abs(self.hspeed) < self.base_max_speed):
+                self.hspeed /= (self.base_friction * skip_delta_factor + (1-1*skip_delta_factor))
+            else:
+                self.hspeed /= (self.friction_factor * skip_delta_factor + (1-1*skip_delta_factor))
 
-        if abs(self.hspeed) > (1.4 * 0.85 / (1.15-1)) * 2 or (num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x60) and abs(self.hspeed) < (1.4 * 0.85 / (1.15-1))):
-            self.hspeed /= (1.15 * 0.5 + (1-1*0.5))
-        else:
-            self.hspeed /= (1.15 * 0.5 + (1-1*0.5))
-
+        # Reseting key variables
         self.pressed_keys = 0
         self.released_keys = 0
 
-        # Stop "ice skating"
+        # Stops "ice skating"
         if abs(self.hspeed) < 0.195 and not controlling:
             self.hspeed = 0
-
 
         if not on_ground and not stuck_in_wall:
             if False:
@@ -555,54 +585,53 @@ class Character:
         self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
         self.vspeed = min(abs(self.vspeed), 15) * sign(self.vspeed)
 
-        #print("X: " + str(self.hspeed))
-        #print("Y: " + str(self.vspeed))
-
         # Spin jumping here
 
-        # Move status here
+        # Gravity based on move status
+        if self.move_status == 1 or self.move_status == 2 or self.move_status == 4:
+            _gravity = 0.54
+        else:
+            _gravity = 0.6
 
         # Gravity
-        self.vspeed += self.applied_gravity*0.5
+        self.vspeed += self.applied_gravity*delta_factor/2
         if self.vspeed > 10:
             self.vspeed = 10
-
+            
+        yprevious = self.y;
+        xprevious = self.x;
         y_previous = self.y
         x_previous = self.x
 
-        doHit = not self.place_free(self.x + self.hspeed, self.y + self.vspeed)
-        #print("X: " + str(self.x + self.hspeed))
-        #print("Y: " + str(self.y + self.vspeed))
+        doHit = not self.place_free(self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor)
         if doHit:
+            # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
+            print(self.y)
         else:
-            self.x += self.hspeed
-            self.y += self.vspeed
+            self.x += self.hspeed * delta_factor
+            self.y += self.vspeed * delta_factor
 
         # Fallback?
         if self.place_free(self.x, self.y + 1):
-            self.vspeed += self.applied_gravity*0.5
+            self.vspeed += self.applied_gravity*delta_factor/2
         if self.vspeed > 10:
             self.vspeed = 10
         self.applied_gravity = 0
 
         # Dropdown platforms? Never heard of them
 
-        #self.x -= self.hspeed
-        #self.y -= self.vspeed
+        self.x -= self.hspeed
+        self.y -= self.vspeed
 
+        # GM8 updates x & y with horizontal and vertical speeds on its own so this is needed
         self.x += self.hspeed
         self.y += self.vspeed
-
-        #if self.hspeed != 0:
-        #    print("HSPEED: " + str(self.hspeed))
-        #if self.vspeed != 0:
-        #    print("VSPEED: " + str(self.vspeed))
 
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-6, -10, 12, 33) #-6 -10 12 33
         self.base_run_power = 1.4
         self.max_hp = 100
         self.weapons = ["Scattergun"]  # Temp Value
@@ -816,8 +845,8 @@ class GameServer:
                         to_send += struct.pack(">B", 0)
                         
                         to_send += struct.pack("<h", 0)
-                        to_send += struct.pack(">B", 0)
-                        to_send += struct.pack("<h", 0)
+                        to_send += struct.pack(">B", joining_player.character_object.intel)
+                        to_send += struct.pack("<h", joining_player.character_object.intelRecharge)
 
                         # Temp Weapon Values
                         to_send += struct.pack(">B", 0)
