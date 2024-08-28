@@ -19,7 +19,7 @@ class rectangle:
 # Code to create collision entities
 # ---------------------------------
 def generate_wall_mask_array(width, height, wm):
-    wm_rect = []
+    wm_rects = []
     for i in range(height):
         current_rect = None
         for j in range(width):
@@ -31,12 +31,24 @@ def generate_wall_mask_array(width, height, wm):
                     current_rect = rectangle(j, i)
             else:
                 if current_rect is not None:
-                    wm_rect.append(current_rect)
+                    wm_rects.append(current_rect)
                     current_rect = None
         if current_rect is not None:
-            wm_rect.append(current_rect)
+            wm_rects.append(current_rect)
 
-    return wm_rect
+    # Merges rectangles vertically if they have the same X, one is below the other, and they are the same width
+    rect_index = 0
+    while rect_index < len(wm_rects):
+        for other_rect in wm_rects:
+            if wm_rects[rect_index] is not other_rect and wm_rects[rect_index].x == other_rect.x and (wm_rects[rect_index].y + wm_rects[rect_index].height) == other_rect.y and wm_rects[rect_index].width == other_rect.width:
+                wm_rects[rect_index].height += other_rect.height
+                wm_rects.remove(other_rect)
+                rect_index -= 1
+                break
+        rect_index += 1
+
+    print("Map Rectangle Count: " + str(len(wm_rects)))
+    return wm_rects
 
 
 # ------------------------
