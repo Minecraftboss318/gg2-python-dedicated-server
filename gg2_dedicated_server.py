@@ -272,6 +272,11 @@ class Character:
         self.aim_distance = 0
 
         # Spinjumping state var
+        if 90 <= self.aim_direction and self.aim_direction <= 270:
+            self.image_xscale = -1
+        else:
+            self.image_xscale = 1
+        self._last_xscale = self.image_xscale
         self.spin_jumping = False
 
         # Kill assist/finish off addition
@@ -356,7 +361,7 @@ class Character:
 
     def good_move_contact_solid(self, arg0, arg1):
         # Function from GG2
-        if arg0 <= 0:
+        if arg1 <= 0:
             return 0;
 
         MAX_I = 8
@@ -469,6 +474,7 @@ class Character:
                     hleft = 0
                     self.hspeed = 0
                     collision_rectified = True
+                    
             if not collision_rectified and (abs(hleft) >= 1 or abs(vleft) >= 1):
                 self.vspeed = 0
                 vleft = 0
@@ -585,13 +591,35 @@ class Character:
         self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
         self.vspeed = min(abs(self.vspeed), 15) * sign(self.vspeed)
 
-        # Spin jumping here
+        # Updating xscale
+        if 90 <= self.aim_direction and self.aim_direction <= 270:
+            self.image_xscale = -1
+        else:
+            self.image_xscale = 1
+
+        # Spinjumping?
+        if sign(self.hspeed) > 0:
+            _test = self._last_xscale > self.image_xscale
+        else:
+            _test = self._last_xscale < self.image_xscale
+
+        if _test and not self.place_free(self.x + sign(self.hspeed), self.y):
+            self.spin_jumping = True
+        else:
+            self.spin_jumping = False
+            
+        self._last_xscale = self.image_xscale
 
         # Gravity based on move status
         if self.move_status == 1 or self.move_status == 2 or self.move_status == 4:
             _gravity = 0.54
         else:
             _gravity = 0.6
+
+        if self.spin_jumping and self.place_free(self.x, self.y - _gravity) and (self.place_free(self.x, self.y +1) or self.vspeed < 0):
+            self.applied_gravity -= _gravity
+        else:
+            self.spin_jumping = False
 
         # Gravity
         self.vspeed += self.applied_gravity*delta_factor/2
@@ -607,7 +635,7 @@ class Character:
         if doHit:
             # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
-            print(self.y)
+            #print(self.y)
         else:
             self.x += self.hspeed * delta_factor
             self.y += self.vspeed * delta_factor
@@ -628,10 +656,20 @@ class Character:
         self.x += self.hspeed
         self.y += self.vspeed
 
+    def end_step(self):
+        if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or True:
+            if self.place_free(self.x, self.y + 6):
+                if not self.place_free(self.x, self.y + 7):
+                    self.y += 6
+                elif math.sqrt((self.hspeed ** 2) + (self.vspeed ** 2)) > 6:
+                    if self.place_free(self.x, self.y + 12):
+                        if not self.place_free(self.x, self.y +13):
+                            self.y += 12
+
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33) #-6 -10 12 33
+        self.character_mask = objectMask(-6, -10, 13, 34) #-6 -10 12 33   6 23
         self.base_run_power = 1.4
         self.max_hp = 100
         self.weapons = ["Scattergun"]  # Temp Value
@@ -846,7 +884,7 @@ class GameServer:
                         
                         to_send += struct.pack("<h", 0)
                         to_send += struct.pack(">B", joining_player.character_object.intel)
-                        to_send += struct.pack("<h", joining_player.character_object.intelRecharge)
+                        to_send += struct.pack("<h", joining_player.character_object.intel_recharge)
 
                         # Temp Weapon Values
                         to_send += struct.pack(">B", 0)
@@ -1155,20 +1193,18 @@ class GameServer:
         while True:
             start_time = time.time()
 
+            # Joins one new player each loop
+            if self.new_connections:
+                self.join_player(self.new_connections[0])
+
+            frame = frame + 1
+
             if len(player_list) > 1:
                 # Begin step collisions
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.begin_step()
-            
-
-            # Joins one new player each loop
-            if self.new_connections:
-                self.join_player(self.new_connections[0])
-
-            if len(player_list) > 1:
-                frame = frame + 1
                 
                 # Processes player/client commands
                 for player_to_service in player_list:
@@ -1192,6 +1228,11 @@ class GameServer:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.normal_step()
 
+                for player_to_service in player_list:
+                    if player_to_service._id != 1000:
+                        if player_to_service.character_object is not None:
+                            player_to_service.character_object.end_step()
+
             # Sends update to all players
             if self.server_to_send:
                 for player_to_service in player_list:
@@ -1211,8 +1252,8 @@ class GameServer:
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
             compute_time = time.time() - start_time
-            if(compute_time < 0.0333):
-                time.sleep(0.0333 - compute_time)
+            if(compute_time < (1/30)):
+                time.sleep((1/30) - compute_time)
             
 
 
