@@ -1049,6 +1049,8 @@ class GameServer:
                 commands_done = 10
                 break
             except ConnectionResetError:
+                self.server_to_send += struct.pack(">B", PLAYER_LEAVE)
+                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
                 player_list.remove(player_to_service)
                 print("Connection Reset Error")
                 print("Player Socket Disconnect")
@@ -1067,6 +1069,8 @@ class GameServer:
             if data[0] == PLAYER_LEAVE:
                 print("Player Left???")
                 conn.close()
+                self.server_to_send += struct.pack(">B", PLAYER_LEAVE)
+                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
                 player_list.remove(player_to_service)
 
             elif data[0] == PLAYER_CHANGETEAM:
@@ -1200,12 +1204,6 @@ class GameServer:
             frame = frame + 1
 
             if len(player_list) > 1:
-                # Begin step collisions
-                for player_to_service in player_list:
-                    if player_to_service._id != 1000:
-                        if player_to_service.character_object is not None:
-                            player_to_service.character_object.begin_step()
-                
                 # Processes player/client commands
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
@@ -1216,6 +1214,12 @@ class GameServer:
                     self.server_to_send += self.serialize_state(QUICK_UPDATE)
                 else:
                     self.server_to_send += self.serialize_state(INPUTSTATE)
+                    
+                # Begin step collisions
+                for player_to_service in player_list:
+                    if player_to_service._id != 1000:
+                        if player_to_service.character_object is not None:
+                            player_to_service.character_object.begin_step()
                     
                 # Alarm Updating
                 for player_to_service in player_list:
@@ -1254,6 +1258,8 @@ class GameServer:
             compute_time = time.time() - start_time
             if(compute_time < (1/30)):
                 time.sleep((1/30) - compute_time)
+            else:
+                print("Server update took too long")
             
 
 
