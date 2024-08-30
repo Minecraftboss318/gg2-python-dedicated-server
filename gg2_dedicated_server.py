@@ -5,16 +5,13 @@ import threading
 import random
 import upnpy
 import math
+from constants import *
 import map_data_extractor
 
 
 # --------------------------------------------------------------------------
 # --------------------------------Variables---------------------------------
 # --------------------------------------------------------------------------
-# Lobby Registration Server Domain and port
-REG_LOBBY_DOMAIN = "ganggarrison.com"
-REG_LOBBY_PORT = 29944
-
 # Server Hosting Port, UPNP toggle, and Registration toggle
 SERVER_PORT = 8150
 USE_UPNP = True
@@ -25,41 +22,6 @@ map_file_path = "ctf_eiger.png"
 
 # Server player name
 host_name = "Host"
-
-# Class Constants
-CLASS_SCOUT = 0
-CLASS_SOLDIER = 1
-CLASS_SNIPER = 2
-CLASS_DEMOMAN = 3
-CLASS_MEDIC = 4
-CLASS_ENGINEER = 5
-CLASS_HEAVY = 6
-CLASS_SPY = 7
-CLASS_PYRO = 8
-CLASS_QUOTE = 9
-
-# Networking Constants
-HELLO = 0
-PLAYER_JOIN = 1
-PLAYER_LEAVE = 2
-PLAYER_CHANGETEAM = 3
-PLAYER_CHANGECLASS = 4
-PLAYER_SPAWN = 5
-
-INPUTSTATE = 6
-CHANGE_MAP = 7
-FULL_UPDATE = 8
-QUICK_UPDATE = 9
-CAPS_UPDATE = 28
-
-PLAYER_DEATH = 10
-SERVER_FULL = 11
-
-JOIN_UPDATE = 44
-
-MESSAGE_STRING = 53
-
-RESERVE_SLOT = 60
 
 #Frame/Tick Variables
 delta_factor = 1
@@ -132,6 +94,29 @@ def upnp_port_mapping():
         )
         print("---UPNP Port Mapped---")
         time.sleep(135)
+
+
+def upnp_exit():
+    upnp = upnpy.UPnP()
+    # Gets devices
+    devices = upnp.discover()
+    # Gets router I think
+    device = upnp.get_igd()
+    # Gets device services
+    device.get_services()
+    # Sets service
+    service = device["WANIPConn1"]
+    # Gets actions for said service
+    service.get_actions()
+
+    service.DeletePortMapping.get_input_arguments()
+    # Finally, add the new port mapping to the IGD
+    # This specific action returns an empty dict: {}
+    service.DeletePortMapping(
+        NewRemoteHost = "",
+        NewExternalPort = SERVER_PORT,
+        NewProtocol = "TCP"
+    )
 
 
 def hex_as_int(input_value):
@@ -1413,6 +1398,7 @@ PROTOCOL_ID = struct.pack(
 ) # Protocol ID
 REG_PACKET_THREE += PROTOCOL_ID
 
+
 def main():
     # Maps UPNP port if UPNP is enabled
     if USE_UPNP == True:
@@ -1443,27 +1429,6 @@ def main():
             print("Accepted connection from", addr)
             game_server.add_connection(conn, addr)
 
-def upnp_exit():
-    upnp = upnpy.UPnP()
-    # Gets devices
-    devices = upnp.discover()
-    # Gets router I think
-    device = upnp.get_igd()
-    # Gets device services
-    device.get_services()
-    # Sets service
-    service = device["WANIPConn1"]
-    # Gets actions for said service
-    service.get_actions()
-
-    service.DeletePortMapping.get_input_arguments()
-    # Finally, add the new port mapping to the IGD
-    # This specific action returns an empty dict: {}
-    service.DeletePortMapping(
-        NewRemoteHost = "",
-        NewExternalPort = SERVER_PORT,
-        NewProtocol = "TCP"
-    )
 
 if __name__ == "__main__":
     assert SERVER_PORT >= 0
