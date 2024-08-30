@@ -657,7 +657,7 @@ class Character:
         self.y += self.vspeed
 
     def end_step(self):
-        if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or True:
+        if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or False:
             if self.place_free(self.x, self.y + 6):
                 if not self.place_free(self.x, self.y + 7):
                     self.y += 6
@@ -669,7 +669,7 @@ class Character:
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 13, 34) #-6 -10 12 33   6 23
+        self.character_mask = objectMask(-6, -10, 13, 34) #-6 -10 12 33
         self.base_run_power = 1.4
         self.max_hp = 100
         self.weapons = ["Scattergun"]  # Temp Value
@@ -1107,20 +1107,16 @@ class GameServer:
                 self.server_to_send += struct.pack(">B", player_to_service._class)
 
             elif data[0] == INPUTSTATE:
+                data = conn.recv(4)
                 if player_to_service.character_object is not None:
-                    data = conn.recv(1)
                     player_to_service.character_object.key_state = data[0]
-                    data = conn.recv(2)
-                    player_to_service.character_object.net_aim_direction = struct.unpack("<H", data[0:2])[0]
+                    player_to_service.character_object.net_aim_direction = struct.unpack("<H", data[1:3])[0]
                     player_to_service.character_object.aim_direction = player_to_service.character_object.net_aim_direction*360/65536
-                    data = conn.recv(1)
-                    player_to_service.character_object.aim_distance = data[0]
+                    player_to_service.character_object.aim_distance = data[3]
 
                     player_to_service.character_object.pressed_keys |= player_to_service.character_object.key_state & ~player_to_service.character_object.last_key_state
                     player_to_service.character_object.released_keys |= ~player_to_service.character_object.key_state & player_to_service.character_object.last_key_state
                     player_to_service.character_object.last_key_state = player_to_service.character_object.key_state
-                else:
-                    data = conn.recv(4)
 
             else:
                 print("Not yet added thing")
@@ -1196,11 +1192,6 @@ class GameServer:
         frame = 0
         while True:
             start_time = time.time()
-
-            # Joins one new player each loop
-            if self.new_connections:
-                self.join_player(self.new_connections[0])
-
             frame = frame + 1
 
             if len(player_list) > 1:
@@ -1211,7 +1202,7 @@ class GameServer:
 
                 # Send players server update
                 if (frame % 7) == 0:
-                    self.server_to_send += self.serialize_state(QUICK_UPDATE)
+                    self.server_to_send += self.serialize_state(QUICK_UPDATE) # <<< Physics Issue
                 else:
                     self.server_to_send += self.serialize_state(INPUTSTATE)
                     
@@ -1255,11 +1246,17 @@ class GameServer:
                         
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
+
+            # Joins one new player each loop
+            if self.new_connections:
+                self.join_player(self.new_connections[0])
+
+            # Make sure server is 30 updates a second
             compute_time = time.time() - start_time
             if(compute_time < (1/30)):
                 time.sleep((1/30) - compute_time)
             else:
-                print("Server update took too long")
+                print("Server update was long")
             
 
 
@@ -1428,7 +1425,7 @@ def main():
     global loaded_map
     loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_path))
 
-    time.sleep(0.1)
+    time.sleep(0.05)
     # Start Game Server
     game_server = GameServer()
     server_networking_thread = threading.Thread(
@@ -1437,7 +1434,7 @@ def main():
     )
     server_networking_thread.start()
 
-    time.sleep(0.1)
+    time.sleep(0.05)
     # Listens for connections and starts a thread to handle them
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", SERVER_PORT))
