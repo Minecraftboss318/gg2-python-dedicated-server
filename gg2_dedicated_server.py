@@ -15,9 +15,10 @@ import map_data_extractor
 REG_LOBBY_DOMAIN = "ganggarrison.com"
 REG_LOBBY_PORT = 29944
 
-# Server Hosting Port and UPNP toggle
+# Server Hosting Port, UPNP toggle, and Registration toggle
 SERVER_PORT = 8150
-USE_UPNP = True
+USE_UPNP = False
+REGISTER_SERVER = False
 
 # Map File
 map_file_path = "ctf_eiger.png"
@@ -72,30 +73,31 @@ room_speed = 30
 # --------------------------------------------------------------------------
 # Updates lobby server of server existance
 def registration(should_loop):
-    while should_loop:
-        # Assembles Packet
-        occupied_slots = struct.pack(">H", len(player_list) - 1)
-        num_bots = struct.pack(">H", 0)
-        current_map_key_length = struct.pack(">B", 3)
-        current_map_key = bytes("map", "utf-8")
-        current_map_length = struct.pack(">H", 9)
-        current_map = bytes("ctf_eiger", "utf-8")
-        packet = (REG_PACKET_ONE
-            + occupied_slots
-            + num_bots
-            + REG_PACKET_TWO
-            + current_map_key_length
-            + current_map_key
-            + current_map_length
-            + current_map
-            + REG_PACKET_THREE)
+    if REGISTER_SERVER:
+        while should_loop:
+            # Assembles Packet
+            occupied_slots = struct.pack(">H", len(player_list) - 1)
+            num_bots = struct.pack(">H", 0)
+            current_map_key_length = struct.pack(">B", 3)
+            current_map_key = bytes("map", "utf-8")
+            current_map_length = struct.pack(">H", 9)
+            current_map = bytes("ctf_eiger", "utf-8")
+            packet = (REG_PACKET_ONE
+                + occupied_slots
+                + num_bots
+                + REG_PACKET_TWO
+                + current_map_key_length
+                + current_map_key
+                + current_map_length
+                + current_map
+                + REG_PACKET_THREE)
 
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
-            sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # COOLER TCP WAY
-            sock.send(packet)
-        print("---Registration Packet Sent---")
-        time.sleep(30)
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
+                sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # COOLER TCP WAY
+                sock.send(packet)
+            print("---Registration Packet Sent---")
+            time.sleep(30)
 
 
 def upnp_port_mapping():
@@ -868,10 +870,10 @@ class GameServer:
                     to_send += struct.pack(">B", int(joining_player.character_object.aim_distance/2))
                     
                     if update_type == QUICK_UPDATE or update_type == FULL_UPDATE:
-                        to_send += struct.pack("<H", int(joining_player.character_object.x*5))
-                        to_send += struct.pack("<H", int(joining_player.character_object.y*5))
-                        to_send += struct.pack(">b", int(joining_player.character_object.hspeed*8.5))
-                        to_send += struct.pack(">b", int(joining_player.character_object.vspeed*8.5))
+                        to_send += struct.pack("<H", int(round(joining_player.character_object.x*5)))
+                        to_send += struct.pack("<H", int(round(joining_player.character_object.y*5)))
+                        to_send += struct.pack(">b", int(round(joining_player.character_object.hspeed*8.5)))
+                        to_send += struct.pack(">b", int(round(joining_player.character_object.vspeed*8.5)))
                         to_send += struct.pack(">B", math.ceil(joining_player.character_object.hp))
                         to_send += struct.pack(">B", 2)  # Ammo Count (Temp Value)
                         
@@ -1189,10 +1191,10 @@ class GameServer:
 
     def run_game_server_networking(self):
         self.server_to_send = bytes("", "utf-8")
+        start_time = time.time()
         frame = 0
         while True:
-            start_time = time.time()
-            frame = frame + 1
+            frame += 1
 
             if len(player_list) > 1:
                 # Processes player/client commands
@@ -1227,6 +1229,15 @@ class GameServer:
                     if player_to_service._id != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
+                            
+            # Make sure server is 30 updates a second
+            compute_time = time.time() - start_time
+            if(compute_time < (1/30)):
+                time.sleep((1/30) - compute_time)
+            else:
+                print("Server update was long")
+
+            start_time = time.time()
 
             # Sends update to all players
             if self.server_to_send:
@@ -1249,15 +1260,7 @@ class GameServer:
 
             # Joins one new player each loop
             if self.new_connections:
-                self.join_player(self.new_connections[0])
-
-            # Make sure server is 30 updates a second
-            compute_time = time.time() - start_time
-            if(compute_time < (1/30)):
-                time.sleep((1/30) - compute_time)
-            else:
-                print("Server update was long")
-            
+                self.join_player(self.new_connections[0])            
 
 
 
