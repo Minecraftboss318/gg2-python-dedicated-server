@@ -17,8 +17,8 @@ REG_LOBBY_PORT = 29944
 
 # Server Hosting Port, UPNP toggle, and Registration toggle
 SERVER_PORT = 8150
-USE_UPNP = False
-REGISTER_SERVER = False
+USE_UPNP = True
+REGISTER_SERVER = True
 
 # Map File
 map_file_path = "ctf_eiger.png"
@@ -72,32 +72,30 @@ room_speed = 30
 # --------------------------------Functions---------------------------------
 # --------------------------------------------------------------------------
 # Updates lobby server of server existance
-def registration(should_loop):
+def server_registration():
     if REGISTER_SERVER:
-        while should_loop:
-            # Assembles Packet
-            occupied_slots = struct.pack(">H", len(player_list) - 1)
-            num_bots = struct.pack(">H", 0)
-            current_map_key_length = struct.pack(">B", 3)
-            current_map_key = bytes("map", "utf-8")
-            current_map_length = struct.pack(">H", 9)
-            current_map = bytes("ctf_eiger", "utf-8")
-            packet = (REG_PACKET_ONE
-                + occupied_slots
-                + num_bots
-                + REG_PACKET_TWO
-                + current_map_key_length
-                + current_map_key
-                + current_map_length
-                + current_map
-                + REG_PACKET_THREE)
+        # Assembles Packet
+        occupied_slots = struct.pack(">H", len(player_list) - 1)
+        num_bots = struct.pack(">H", 0)
+        current_map_key_length = struct.pack(">B", 3)
+        current_map_key = bytes("map", "utf-8")
+        current_map_length = struct.pack(">H", 9)
+        current_map = bytes("ctf_eiger", "utf-8")
+        packet = (REG_PACKET_ONE
+            + occupied_slots
+            + num_bots
+            + REG_PACKET_TWO
+            + current_map_key_length
+            + current_map_key
+            + current_map_length
+            + current_map
+            + REG_PACKET_THREE)
 
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
-                sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # COOLER TCP WAY
-                sock.send(packet)
-            print("---Registration Packet Sent---")
-            time.sleep(30)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
+            sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # COOLER TCP WAY
+            sock.send(packet)
+        print("---Registration Packet Sent---")
 
 
 def upnp_port_mapping():
@@ -671,7 +669,7 @@ class Character:
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 13, 34) #-6 -10 12 33
+        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
         self.base_run_power = 1.4
         self.max_hp = 100
         self.weapons = ["Scattergun"]  # Temp Value
@@ -685,7 +683,7 @@ class Scout(Character):
 
 class Soldier(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 160
         self.weapons = ["Rocketlauncher"]  # Temp Value
@@ -697,7 +695,7 @@ class Soldier(Character):
 
 class Sniper(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 120
         self.weapons = ["Rifle"]  # Temp Value
@@ -709,7 +707,7 @@ class Sniper(Character):
 
 class Demoman(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-6.5, -9.5, 14, 33) #-7, -10, 14, 33
         self.base_run_power = 1
         self.max_hp = 120
         self.weapons = ["Minegun"]  # Temp Value
@@ -721,7 +719,7 @@ class Demoman(Character):
 
 class Medic(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-6.5, -7.5, 14, 31) #-7, -8, 14, 31
         self.base_run_power = 1.09
         self.max_hp = 120
         self.weapons = ["Medigun"]  # Temp Value
@@ -734,7 +732,7 @@ class Medic(Character):
 
 class Engineer(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33 
         self.base_run_power = 1
         self.max_hp = 120
         self.weapons = ["Shotgun"]  # Temp Value
@@ -746,7 +744,7 @@ class Engineer(Character):
 
 class Heavy(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-8.5, -11.5, 18, 35) #-9, -12, 18, 35
         self.base_run_power = 0.8
         self.max_hp = 200
         self.weapons = ["Minigun"]  # Temp Value
@@ -758,7 +756,7 @@ class Heavy(Character):
 
 class Spy(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
         self.base_run_power = 1.08
         self.max_hp = 100
         self.weapons = ["Revolver"]  # Temp Value
@@ -771,7 +769,7 @@ class Spy(Character):
 
 class Pyro(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-6.5, -5.5, 14, 29) #-7, -6, 14, 29
         self.base_run_power = 1.1
         self.max_hp = 120
         self.weapons = ["Flamethrower"]  # Temp Value
@@ -784,7 +782,7 @@ class Pyro(Character):
 
 class Quote(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6, -10, 12, 33)
+        self.character_mask = objectMask(-6.5, -11.5, 14, 23) #-7, -12, 14, 23
         self.base_run_power = 1.07
         self.max_hp = 140
         self.weapons = ["Blade"]  # Temp Value
@@ -1032,7 +1030,7 @@ class GameServer:
                 print("Sent New Connection Data Back")
                 conn.sendall(to_send)
                 print("Connection setup complete")
-                registration(False)
+                server_registration()
                 break
             print("Sent New Connection Data Back")
             conn.sendall(to_send)
@@ -1194,6 +1192,9 @@ class GameServer:
         start_time = time.time()
         frame = 0
         while True:
+            if (frame % 900) == 0:
+                server_registration()
+            
             frame += 1
 
             if len(player_list) > 1:
@@ -1204,7 +1205,7 @@ class GameServer:
 
                 # Send players server update
                 if (frame % 7) == 0:
-                    self.server_to_send += self.serialize_state(QUICK_UPDATE) # <<< Physics Issue
+                    self.server_to_send += self.serialize_state(QUICK_UPDATE)
                 else:
                     self.server_to_send += self.serialize_state(INPUTSTATE)
                     
@@ -1419,16 +1420,10 @@ def main():
         upnp_thread.start()
         time.sleep(5)
 
-
-    # Starts registration loop thread
-    reg_thread = threading.Thread(target = registration, args = (True,))
-    reg_thread.start()
-
     # Gets map entities and wallmask
     global loaded_map
     loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_path))
 
-    time.sleep(0.05)
     # Start Game Server
     game_server = GameServer()
     server_networking_thread = threading.Thread(
