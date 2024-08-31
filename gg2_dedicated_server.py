@@ -30,11 +30,14 @@ map_file_name = "ctf_eiger"
 # Max connected players
 max_players = 5
 
+# Server password
+server_password = ""
+
 # Server player name
 host_name = "Host"
 
 # Server plugins
-server_plugins_required = True
+server_plugins_required = False
 server_plugins_list = ""
 
 #Frame/Tick Variables
@@ -53,6 +56,10 @@ def server_registration():
         # Assembles Packet
         occupied_slots = struct.pack(">H", len(player_list) - 1)
         num_bots = struct.pack(">H", 0)
+        if server_password == "":
+            has_password = struct.pack(">H", 0)
+        else:
+            has_password = struct.pack(">H", 1)
         current_map_key_length = struct.pack(">B", 3)
         current_map_key = bytes("map", "utf-8")
         current_map_length = struct.pack(">H", len(map_file_name))
@@ -60,6 +67,7 @@ def server_registration():
         packet = (REG_PACKET_ONE
             + occupied_slots
             + num_bots
+            + has_password
             + REG_PACKET_TWO
             + current_map_key_length
             + current_map_key
@@ -934,7 +942,8 @@ class GameServer:
         return to_send
 
     def join_player(self, conn):
-        state = STATE_EXPECT_HELLO
+        new_state = STATE_EXPECT_HELLO
+        state = new_state
         while True:
             try:
                 data = conn.recv(1024)
@@ -951,37 +960,54 @@ class GameServer:
             if state == STATE_EXPECT_HELLO:
                 if data[0] == HELLO:
                     print("Received Hello")
-                    if data[1:17] == PROTOCOL_ID:
-                        print("Compatible Protocol Received")
-                        # Assembles Response
-                        to_send = struct.pack(">B", HELLO)
-                        to_send += struct.pack(">B", len(server_name))  # Server name length
-                        to_send += bytes(server_name, "utf-8")  # Server name
-                        to_send += struct.pack(">B", len(map_file_name))  # Map name length
-                        to_send += bytes(map_file_name, "utf-8")  # Map name
-                        to_send += struct.pack(">B", 0)  # Map md5 length
-                        to_send += bytes("", "utf-8")  # Map md5
-
-                        plugins_md5_list = ""
-                        if len(server_plugins_list) > 1:
-                            plugins_list = list(server_plugins_list.split(", "))
-                            for plugin_name in plugins_list:
-                                if len(plugins_md5_list) > 0:
-                                    plugins_md5_list += ","
-                                plugins_md5_list += plugin_name + "@" + (urllib.request.urlopen("http://www.ganggarrison.com/plugins/" + plugin_name + ".md5").read().decode('utf-8'))
-                        
-                        to_send += struct.pack(">B", int(server_plugins_required))  # Server plugins required?
-                        to_send += struct.pack("<H", len(plugins_md5_list))  # Plugin list length
-                        to_send += bytes(plugins_md5_list, "utf-8")  # Plugin list
-
-                        state = STATE_EXPECT_COMMAND
-                    else:
+                    if data[1:17] != PROTOCOL_ID:
                         print("Incompatible Protocol Received")
                         to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
                         conn.sendall(to_send)
                         break
+                    elif server_password == "":
+                        print("Compatible Protocol Received")
+                        state = STATE_CLIENT_AUTHENTICATED
+                    else:
+                        print("Compatible Protocol Received")
+                        to_send = struct.pack(">B", PASSWORD_REQUEST)
+                        new_state = STATE_EXPECT_PASSWORD
 
-            if state == STATE_EXPECT_COMMAND:  
+            if state == STATE_EXPECT_PASSWORD:
+                if str(data[1:data[0] + 1].decode('utf-8')) == server_password:
+                    print("Received Correct Password")
+                    state = STATE_CLIENT_AUTHENTICATED
+                else:
+                    print("Received Wrong Password")
+                    to_send = struct.pack(">B", PASSWORD_WRONG)
+                    conn.sendall(to_send)
+                    break;
+            
+            if state == STATE_CLIENT_AUTHENTICATED:
+                print("Client Authenticated")
+                # Assembles Response to authenticated client
+                to_send = struct.pack(">B", HELLO)
+                to_send += struct.pack(">B", len(server_name))  # Server name length
+                to_send += bytes(server_name, "utf-8")  # Server name
+                to_send += struct.pack(">B", len(map_file_name))  # Map name length
+                to_send += bytes(map_file_name, "utf-8")  # Map name
+                to_send += struct.pack(">B", 0)  # Map md5 length
+                to_send += bytes("", "utf-8")  # Map md5
+
+                plugins_md5_list = ""
+                if len(server_plugins_list) > 1:
+                    plugins_list = list(server_plugins_list.split(", "))
+                    for plugin_name in plugins_list:
+                        if len(plugins_md5_list) > 0:
+                            plugins_md5_list += ","
+                        plugins_md5_list += plugin_name + "@" + (urllib.request.urlopen("http://www.ganggarrison.com/plugins/" + plugin_name + ".md5").read().decode('utf-8'))
+                
+                to_send += struct.pack(">B", int(server_plugins_required))  # Server plugins required?
+                to_send += struct.pack("<H", len(plugins_md5_list))  # Plugin list length
+                to_send += bytes(plugins_md5_list, "utf-8")  # Plugin list
+                new_state = STATE_EXPECT_COMMAND
+
+            elif state == STATE_EXPECT_COMMAND:  
                 if data[0] == PING:
                     pass
 
@@ -995,7 +1021,7 @@ class GameServer:
                     client_player = Player(
                         conn,
                         int(client_player_id),
-                        str(data[2:data[1] + 2].decode()),
+                        str(data[2:data[1] + 2].decode('utf-8')),
                         TEAM_SPECTATOR,
                         CLASS_SCOUT,
                     )
@@ -1056,6 +1082,7 @@ class GameServer:
                     break
             print("Sent New Connection Data Back")
             conn.sendall(to_send)
+            state = new_state
         self.new_connections.remove(conn)
 
     def process_client_commands(self, player_to_service):
@@ -1363,8 +1390,7 @@ REG_PACKET_ONE += struct.pack(">H", SERVER_PORT) # Hosting Port
 REG_PACKET_ONE += struct.pack(">H", 5)           # Player Limit
 
 # Registration Packet 2
-REG_PACKET_TWO = struct.pack(">H", 0)  # Server Password
-REG_PACKET_TWO += struct.pack(">H", 7) # Amount of Value Groups
+REG_PACKET_TWO = struct.pack(">H", 7) # Amount of Value Groups
 # Server Name
 # Server Name Key Length
 REG_PACKET_TWO += struct.pack(">B", 4)
