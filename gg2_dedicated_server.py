@@ -5,6 +5,7 @@ import threading
 import random
 import upnpy
 import math
+import urllib.request
 from constants import *
 import map_data_extractor
 
@@ -31,6 +32,10 @@ max_players = 5
 
 # Server player name
 host_name = "Host"
+
+# Server plugins
+server_plugins_required = True
+server_plugins_list = ""
 
 #Frame/Tick Variables
 delta_factor = 1
@@ -929,6 +934,7 @@ class GameServer:
         return to_send
 
     def join_player(self, conn):
+        state = STATE_EXPECT_HELLO
         while True:
             try:
                 data = conn.recv(1024)
@@ -942,96 +948,112 @@ class GameServer:
             print("Received New Connection Data")
             print(data)
 
-            if data[0] == HELLO:
-                print("Received Hello")
-                if data[1:17] == PROTOCOL_ID:
-                    print("Compatible Protocol Received")
+            if state == STATE_EXPECT_HELLO:
+                if data[0] == HELLO:
+                    print("Received Hello")
+                    if data[1:17] == PROTOCOL_ID:
+                        print("Compatible Protocol Received")
+                        # Assembles Response
+                        to_send = struct.pack(">B", HELLO)
+                        to_send += struct.pack(">B", len(server_name))  # Server name length
+                        to_send += bytes(server_name, "utf-8")  # Server name
+                        to_send += struct.pack(">B", len(map_file_name))  # Map name length
+                        to_send += bytes(map_file_name, "utf-8")  # Map name
+                        to_send += struct.pack(">B", 0)  # Map md5 length
+                        to_send += bytes("", "utf-8")  # Map md5
+
+                        plugins_md5_list = ""
+                        if len(server_plugins_list) > 1:
+                            plugins_list = list(server_plugins_list.split(", "))
+                            for plugin_name in plugins_list:
+                                if len(plugins_md5_list) > 0:
+                                    plugins_md5_list += ","
+                                plugins_md5_list += plugin_name + "@" + (urllib.request.urlopen("http://www.ganggarrison.com/plugins/" + plugin_name + ".md5").read().decode('utf-8'))
+                        
+                        to_send += struct.pack(">B", int(server_plugins_required))  # Server plugins required?
+                        to_send += struct.pack("<H", len(plugins_md5_list))  # Plugin list length
+                        to_send += bytes(plugins_md5_list, "utf-8")  # Plugin list
+
+                        state = STATE_EXPECT_COMMAND
+                    else:
+                        print("Incompatible Protocol Received")
+                        to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
+                        conn.sendall(to_send)
+                        break
+
+            if state == STATE_EXPECT_COMMAND:  
+                if data[0] == PING:
+                    pass
+
+                elif data[0] == RESERVE_SLOT:
+                    print("Received Reserve Slot")
+                    # Generates player ID for new player
+                    client_player_id = random.randint(1000, 9999)
+                    while(client_player_id in player_list):
+                        client_player_id = random.randint(1000, 9999)
+                    # playerID, playerName, playerTeam, playerClass
+                    client_player = Player(
+                        conn,
+                        int(client_player_id),
+                        str(data[2:data[1] + 2].decode()),
+                        TEAM_SPECTATOR,
+                        CLASS_SCOUT,
+                    )
                     # Assembles Response
-                    to_send = struct.pack(">B", HELLO)
-                    to_send += struct.pack(">B", len(server_name))  # Server name length
-                    to_send += bytes(server_name, "utf-8")  # Server name
+                    if (len(player_list) - 1) < max_players:
+                        print("Slot Reserved")
+                        to_send = struct.pack(">B", RESERVE_SLOT)
+                    else:
+                        print("Server Full")
+                        to_send = struct.pack(">B", SERVER_FULL)
+                        conn.sendall(to_send)
+                        break
+
+                elif data[0] == PLAYER_JOIN:
+                    print("Received Player Join")
+                    # Writes JOIN_UPDATE with num of players and map area
+                    to_send = struct.pack(">B", JOIN_UPDATE)
+                    to_send += struct.pack(">B", len(player_list))
+                    to_send += struct.pack(">B", 1)
+
+                    # Writes the current map n stuff
+                    to_send += struct.pack(">B", CHANGE_MAP)
                     to_send += struct.pack(">B", len(map_file_name))  # Map name length
                     to_send += bytes(map_file_name, "utf-8")  # Map name
                     to_send += struct.pack(">B", 0)  # Map md5 length
                     to_send += bytes("", "utf-8")  # Map md5
-                    to_send += struct.pack(">B", 0)  # Server plugins required?
-                    to_send += struct.pack(">H", 0)  # Plugin list length
-                    to_send += bytes("", "utf-8")  # Plugin list
-                else:
-                    print("Incompatible Protocol Received")
-                    to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
+
+                    # Player joining n stuff
+                    for player_index, joining_player in enumerate(player_list):
+                        to_send += struct.pack(">B", PLAYER_JOIN)
+                        to_send += struct.pack(">B", len(joining_player.name))
+                        to_send += bytes(joining_player.name, "utf-8")
+                        # Set player class
+                        to_send += struct.pack(">B", PLAYER_CHANGECLASS)
+                        to_send += struct.pack(">B", player_index)
+                        to_send += struct.pack(">B", joining_player._class)
+                        # Sets player team
+                        to_send += struct.pack(">B", PLAYER_CHANGETEAM)
+                        to_send += struct.pack(">B", player_index)
+                        to_send += struct.pack(">B", joining_player.team)
+                    # Writes FULL_UPDATE stuff
+                    to_send += self.serialize_state(FULL_UPDATE)
+
+                    player_list.append(client_player)
+                    # Server Player Join
+                    self.server_to_send += struct.pack(">B", PLAYER_JOIN)
+                    self.server_to_send += struct.pack(">B", len(client_player.name))
+                    self.server_to_send += bytes(client_player.name, "utf-8")
+
+                    # Server Message
+                    to_send += struct.pack(">B", MESSAGE_STRING)
+                    to_send += struct.pack(">B", len(welcome_message))
+                    to_send += bytes(welcome_message, "utf-8")
+                    print("Sent New Connection Data Back")
                     conn.sendall(to_send)
+                    print("Connection setup complete")
+                    server_registration()
                     break
-
-            elif data[0] == RESERVE_SLOT:
-                print("Received Reserve Slot")
-                # Generates player ID for new player
-                client_player_id = random.randint(1000, 9999)
-                while(client_player_id in player_list):
-                    client_player_id = random.randint(1000, 9999)
-                # playerID, playerName, playerTeam, playerClass
-                client_player = Player(
-                    conn,
-                    int(client_player_id),
-                    str(data[2:data[1] + 2].decode()),
-                    TEAM_SPECTATOR,
-                    CLASS_SCOUT,
-                )
-                # Assembles Response
-                if (len(player_list) - 1) < max_players:
-                    print("Slot Reserved")
-                    to_send = struct.pack(">B", RESERVE_SLOT)
-                else:
-                    print("Server Full")
-                    to_send = struct.pack(">B", SERVER_FULL)
-                    conn.sendall(to_send)
-                    break
-
-            elif data[0] == PLAYER_JOIN:
-                print("Received Player Join")
-                # Writes JOIN_UPDATE with num of players and map area
-                to_send = struct.pack(">B", JOIN_UPDATE)
-                to_send += struct.pack(">B", len(player_list))
-                to_send += struct.pack(">B", 1)
-
-                # Writes the current map n stuff
-                to_send += struct.pack(">B", CHANGE_MAP)
-                to_send += struct.pack(">B", len(map_file_name))  # Map name length
-                to_send += bytes(map_file_name, "utf-8")  # Map name
-                to_send += struct.pack(">B", 0)  # Map md5 length
-                to_send += bytes("", "utf-8")  # Map md5
-
-                # Player joining n stuff
-                for player_index, joining_player in enumerate(player_list):
-                    to_send += struct.pack(">B", PLAYER_JOIN)
-                    to_send += struct.pack(">B", len(joining_player.name))
-                    to_send += bytes(joining_player.name, "utf-8")
-                    # Set player class
-                    to_send += struct.pack(">B", PLAYER_CHANGECLASS)
-                    to_send += struct.pack(">B", player_index)
-                    to_send += struct.pack(">B", joining_player._class)
-                    # Sets player team
-                    to_send += struct.pack(">B", PLAYER_CHANGETEAM)
-                    to_send += struct.pack(">B", player_index)
-                    to_send += struct.pack(">B", joining_player.team)
-                # Writes FULL_UPDATE stuff
-                to_send += self.serialize_state(FULL_UPDATE)
-
-                player_list.append(client_player)
-                # Server Player Join
-                self.server_to_send += struct.pack(">B", PLAYER_JOIN)
-                self.server_to_send += struct.pack(">B", len(client_player.name))
-                self.server_to_send += bytes(client_player.name, "utf-8")
-
-                # Server Message
-                to_send += struct.pack(">B", MESSAGE_STRING)
-                to_send += struct.pack(">B", len(welcome_message))
-                to_send += bytes(welcome_message, "utf-8")
-                print("Sent New Connection Data Back")
-                conn.sendall(to_send)
-                print("Connection setup complete")
-                server_registration()
-                break
             print("Sent New Connection Data Back")
             conn.sendall(to_send)
         self.new_connections.remove(conn)
