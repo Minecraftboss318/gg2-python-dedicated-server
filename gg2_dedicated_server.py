@@ -12,13 +12,22 @@ import map_data_extractor
 # --------------------------------------------------------------------------
 # --------------------------------Variables---------------------------------
 # --------------------------------------------------------------------------
-# Server Hosting Port, UPNP toggle, and Registration toggle
+# Server hosting port, UPNP toggle, and registration toggle
 SERVER_PORT = 8150
 USE_UPNP = True
 REGISTER_SERVER = True
 
-# Map File
-map_file_path = "ctf_eiger.png"
+# Server name
+server_name = "Python Testing Server"
+
+# Server welcome message
+welcome_message = "You made it!"
+
+# Map file
+map_file_name = "ctf_eiger"
+
+# Max connected players
+max_players = 5
 
 # Server player name
 host_name = "Host"
@@ -41,8 +50,8 @@ def server_registration():
         num_bots = struct.pack(">H", 0)
         current_map_key_length = struct.pack(">B", 3)
         current_map_key = bytes("map", "utf-8")
-        current_map_length = struct.pack(">H", 9)
-        current_map = bytes("ctf_eiger", "utf-8")
+        current_map_length = struct.pack(">H", len(map_file_name))
+        current_map = bytes(map_file_name, "utf-8")
         packet = (REG_PACKET_ONE
             + occupied_slots
             + num_bots
@@ -192,6 +201,14 @@ class Player:
 
         self.respawn_timer = 1
 
+    def leave_server(self):
+        to_send = struct.pack(">B", PLAYER_LEAVE)
+        to_send += struct.pack(">B", player_list.index(self))
+        player_list.remove(self)
+        players_to_remove.remove(self)
+        print("Player Socket Disconnect")
+        return to_send
+
 
 class Character:
     def __init__(self, player_object):
@@ -314,7 +331,6 @@ class Character:
         self.run_power = self.base_run_power
         self.base_max_speed = abs(self.base_run_power * self.base_control / (self.base_friction-1))
         self.highest_base_max_speed = 9.735  # Approximation error < 0.0017 of scout's base max speed
-
 
     def place_free(self, xPos, yPos):
         collisions = []
@@ -929,20 +945,20 @@ class GameServer:
                 f.write(data)
             if data[0] == HELLO:
                 print("Received Hello")
-                to_send = struct.pack(">B", 43)
+                to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
                 if data[1:17] == PROTOCOL_ID:
                     print("Compatible Protocol Received")
                     # Assembles Response
                     to_send = struct.pack(">B", HELLO)
-                    to_send += struct.pack(">B", 21)
-                    to_send += bytes("Python Server Testing", "utf-8")
-                    to_send += struct.pack(">B", 9)
-                    to_send += bytes("ctf_eiger", "utf-8")
-                    to_send += struct.pack(">B", 0)
-                    to_send += bytes("", "utf-8")
-                    to_send += struct.pack(">B", 0)
-                    to_send += struct.pack(">H", 0)
-                    to_send += bytes("", "utf-8")
+                    to_send += struct.pack(">B", len(server_name))  # Server name length
+                    to_send += bytes(server_name, "utf-8")  # Server name
+                    to_send += struct.pack(">B", len(map_file_name))  # Map name length
+                    to_send += bytes(map_file_name, "utf-8")  # Map name
+                    to_send += struct.pack(">B", 0)  # Map md5 length
+                    to_send += bytes("", "utf-8")  # Map md5
+                    to_send += struct.pack(">B", 0)  # Server plugins required?
+                    to_send += struct.pack(">H", 0)  # Plugin list length
+                    to_send += bytes("", "utf-8")  # Plugin list
                 else:
                     print("Incompatible Protocol Received")
                     conn.sendall(to_send)
@@ -959,12 +975,12 @@ class GameServer:
                     conn,
                     int(client_player_id),
                     str(data[2:data[1] + 2].decode()),
-                    2,
-                    0,
+                    TEAM_SPECTATOR,
+                    CLASS_SCOUT,
                 )
                 # Assembles Response
                 to_send = struct.pack(">B", SERVER_FULL)
-                if 4 < 5:
+                if (len(player_list) - 1) < max_players:
                     print("Slot Reserved")
                     to_send = struct.pack(">B", RESERVE_SLOT)
                 else:
@@ -981,10 +997,10 @@ class GameServer:
 
                 # Writes the current map n stuff
                 to_send += struct.pack(">B", CHANGE_MAP)
-                to_send += struct.pack(">B", 9)
-                to_send += bytes("ctf_eiger", "utf-8")
-                to_send += struct.pack(">B", 0)
-                to_send += bytes("", "utf-8")
+                to_send += struct.pack(">B", len(map_file_name))  # Map name length
+                to_send += bytes(map_file_name, "utf-8")  # Map name
+                to_send += struct.pack(">B", 0)  # Map md5 length
+                to_send += bytes("", "utf-8")  # Map md5
 
                 # Player joining n stuff
                 for player_index, joining_player in enumerate(player_list):
@@ -1010,8 +1026,8 @@ class GameServer:
 
                 # Server Message
                 to_send += struct.pack(">B", MESSAGE_STRING)
-                to_send += struct.pack(">B", 12)
-                to_send += bytes("You Made It!", "utf-8")
+                to_send += struct.pack(">B", len(welcome_message))
+                to_send += bytes(welcome_message, "utf-8")
                 print("Sent New Connection Data Back")
                 conn.sendall(to_send)
                 print("Connection setup complete")
@@ -1034,11 +1050,8 @@ class GameServer:
                 commands_done = 10
                 break
             except ConnectionResetError:
-                self.server_to_send += struct.pack(">B", PLAYER_LEAVE)
-                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
-                player_list.remove(player_to_service)
+                players_to_remove.append(player_to_service)
                 print("Connection Reset Error")
-                print("Player Socket Disconnect")
                 commands_done = 10
                 break
             except TimeoutError:
@@ -1053,10 +1066,7 @@ class GameServer:
             # Reactions to client data
             if data[0] == PLAYER_LEAVE:
                 print("Player Left???")
-                conn.close()
-                self.server_to_send += struct.pack(">B", PLAYER_LEAVE)
-                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
-                player_list.remove(player_to_service)
+                players_to_remove.append(player_to_service)
 
             elif data[0] == PLAYER_CHANGETEAM:
                 print("Received Change Team")
@@ -1116,31 +1126,31 @@ class GameServer:
         player_to_service.respawn_timer = player_to_service.respawn_timer - 1
         if (player_to_service.respawn_timer <= 0
                 and player_to_service.character_object is None
-                and (player_to_service.team == 0
-                     or player_to_service.team == 1)
+                and (player_to_service.team == TEAM_RED
+                     or player_to_service.team == TEAM_BLUE)
                 and (0 <= player_to_service._class
                      and player_to_service._class <= 9)):
             print(player_to_service.team);
             # Player Spawning
-            if player_to_service._class == 0:
+            if player_to_service._class == CLASS_SCOUT:
                 player_to_service.character_object = Scout(player_to_service)
-            elif player_to_service._class == 1:
+            elif player_to_service._class == CLASS_SOLDIER:
                 player_to_service.character_object = Soldier(player_to_service)
-            elif player_to_service._class == 2:
+            elif player_to_service._class == CLASS_SNIPER:
                 player_to_service.character_object = Sniper(player_to_service)
-            elif player_to_service._class == 3:
+            elif player_to_service._class == CLASS_DEMOMAN:
                 player_to_service.character_object = Demoman(player_to_service)
-            elif player_to_service._class == 4:
+            elif player_to_service._class == CLASS_MEDIC:
                 player_to_service.character_object = Medic(player_to_service)
-            elif player_to_service._class == 5:
+            elif player_to_service._class == CLASS_ENGINEER:
                 player_to_service.character_object = Engineer(player_to_service)
-            elif player_to_service._class == 6:
+            elif player_to_service._class == CLASS_HEAVY:
                 player_to_service.character_object = Heavy(player_to_service)
-            elif player_to_service._class == 7:
+            elif player_to_service._class == CLASS_SPY:
                 player_to_service.character_object = Spy(player_to_service)
-            elif player_to_service._class == 8:
+            elif player_to_service._class == CLASS_PYRO:
                 player_to_service.character_object = Pyro(player_to_service)
-            elif player_to_service._class == 9:
+            elif player_to_service._class == CLASS_QUOTE:
                 player_to_service.character_object = Quote(player_to_service)
             
             self.server_to_send += struct.pack(">B", PLAYER_SPAWN)
@@ -1149,7 +1159,7 @@ class GameServer:
                 player_list.index(player_to_service),
             )
             
-            if player_to_service.team == 0:
+            if player_to_service.team == TEAM_RED:
                 random_spawn = random.randint(0, len(loaded_map.redspawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning red player locally
@@ -1159,7 +1169,7 @@ class GameServer:
                 player_to_service.character_object.y = loaded_map.redspawns[
                     random_spawn
                 ].y
-            elif player_to_service.team == 1:
+            elif player_to_service.team == TEAM_BLUE:
                 random_spawn = random.randint(0,len(loaded_map.bluespawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning blue player locally
@@ -1177,10 +1187,17 @@ class GameServer:
         start_time = time.time()
         frame = 0
         while True:
+            # Registers server with GG2 lobby server
             if (frame % 900) == 0:
                 server_registration()
             
             frame += 1
+
+            # Removes players from server
+            if len(players_to_remove) > 0:
+                for player in players_to_remove:
+                    self.server_to_send += player.leave_server()
+                server_registration()
 
             if len(player_list) > 1:
                 # Processes player/client commands
@@ -1233,9 +1250,8 @@ class GameServer:
                             conn = player_to_service.connection
                             conn.sendall(self.server_to_send)
                         except ConnectionResetError:
-                            player_list.remove(player_to_service)
+                            players_to_remove.append(player_to_service)
                             print("Connection Reset Error")
-                            print("Player Socket Disconnect")
                         except BlockingIOError:
                             pass
                         except TimeoutError:
@@ -1254,7 +1270,8 @@ class GameServer:
 # --------------END OF DEFINING START OF CODE EXECUTION---------------------
 # --------------------------------------------------------------------------
 # Creates list for players
-player_list = [Player(None, 1000, host_name, 2, 0)]
+player_list = [Player(None, 1000, host_name, TEAM_SPECTATOR, CLASS_SCOUT)]
+players_to_remove = []
 
 
 # Stuff below is setting up packet for registration
@@ -1329,9 +1346,9 @@ REG_PACKET_TWO += struct.pack(">B", 4)
 # Server Name Key
 REG_PACKET_TWO += bytes("name", "utf-8")
 # Server Name Length
-REG_PACKET_TWO += struct.pack(">H", 21)
+REG_PACKET_TWO += struct.pack(">H", len(server_name))
 # Server Name
-REG_PACKET_TWO += bytes("Python Server Testing", "utf-8")
+REG_PACKET_TWO += bytes(server_name, "utf-8")
 
 # Game Name
 # Game Name Key Length
@@ -1408,7 +1425,7 @@ def main():
 
     # Gets map entities and wallmask
     global loaded_map
-    loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_path))
+    loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_name + ".png"))
 
     # Start Game Server
     game_server = GameServer()
