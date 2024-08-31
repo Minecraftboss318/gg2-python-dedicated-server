@@ -941,11 +941,9 @@ class GameServer:
                 break
             print("Received New Connection Data")
             print(data)
-            with open("connData.txt", "wb") as f:
-                f.write(data)
+
             if data[0] == HELLO:
                 print("Received Hello")
-                to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
                 if data[1:17] == PROTOCOL_ID:
                     print("Compatible Protocol Received")
                     # Assembles Response
@@ -961,6 +959,7 @@ class GameServer:
                     to_send += bytes("", "utf-8")  # Plugin list
                 else:
                     print("Incompatible Protocol Received")
+                    to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
                     conn.sendall(to_send)
                     break
 
@@ -979,12 +978,12 @@ class GameServer:
                     CLASS_SCOUT,
                 )
                 # Assembles Response
-                to_send = struct.pack(">B", SERVER_FULL)
                 if (len(player_list) - 1) < max_players:
                     print("Slot Reserved")
                     to_send = struct.pack(">B", RESERVE_SLOT)
                 else:
                     print("Server Full")
+                    to_send = struct.pack(">B", SERVER_FULL)
                     conn.sendall(to_send)
                     break
 
@@ -1056,6 +1055,10 @@ class GameServer:
                 break
             except TimeoutError:
                 print("Timeout?")
+                commands_done = 10
+                break
+
+            if not data:
                 commands_done = 10
                 break
             
