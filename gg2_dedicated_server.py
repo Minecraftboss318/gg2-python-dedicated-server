@@ -15,8 +15,8 @@ import map_data_extractor
 # --------------------------------------------------------------------------
 # Server hosting port, UPNP toggle, and registration toggle
 SERVER_PORT = 8150
-USE_UPNP = True
-REGISTER_SERVER = True
+USE_UPNP = False
+REGISTER_SERVER = False
 
 # Server name
 server_name = "Python Testing Server"
@@ -948,7 +948,6 @@ class GameServer:
             try:
                 data = conn.recv(1024)
             except ConnectionResetError:
-                player_list.remove(client_player)
                 print("New Connection Socket Disconnect")
                 break
             if not data:
@@ -1103,7 +1102,7 @@ class GameServer:
                 commands_done = 10
                 break
             except TimeoutError:
-                print("Timeout?")
+                print("Timeout???")
                 commands_done = 10
                 break
 
@@ -1305,9 +1304,12 @@ class GameServer:
                             players_to_remove.append(player_to_service)
                             print("Connection Reset Error")
                         except BlockingIOError:
-                            pass
+                            print("Blocking IO Error")
+                        except BrokenPipeError:
+                            players_to_remove.append(player_to_service)
+                            print("Broken Pipe Error")
                         except TimeoutError:
-                            print("Server Send Timeout")
+                            print("Server Send Timeout???")
                         
             # Clears data to send
             self.server_to_send = bytes("", "utf-8")
