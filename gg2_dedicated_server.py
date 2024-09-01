@@ -5,6 +5,8 @@ import threading
 import random
 import upnpy
 import math
+import os.path
+import configparser
 import urllib.request
 from constants import *
 import map_data_extractor
@@ -13,32 +15,34 @@ import map_data_extractor
 # --------------------------------------------------------------------------
 # --------------------------------Variables---------------------------------
 # --------------------------------------------------------------------------
-# Server hosting port, UPNP toggle, and registration toggle
-SERVER_PORT = 8150
-USE_UPNP = False
-REGISTER_SERVER = False
+# Creates server configuration file if one doesn't exist
+config = configparser.ConfigParser()
+if not os.path.isfile("server_conf.ini"):
+    config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1"}
+    config["Server Settings"] = {"server_name": "Python Server", "welcome_message": "", "host_name": "Host", "password": "", "max_players": "10"}
+    config["Plugin Settings"] = {"server_plugins_required": "0", "server_plugin_list": ""}
 
-# Server name
-server_name = "Python Testing Server"
+    with open("server_conf.ini", "w") as configfile:
+        config.write(configfile)
 
-# Server welcome message
-welcome_message = "You made it!"
+# Reads in server configuration values
+config.read("server_conf.ini")
+# Connection Settings
+SERVER_PORT = int(config["Connection Settings"]["server_port"])
+USE_UPNP = bool(int(config["Connection Settings"]["use_upnp"]))
+REGISTER_SERVER = bool(int(config["Connection Settings"]["use_lobby"]))
+# Server Settings
+server_name = str(config["Server Settings"]["server_name"])
+welcome_message = str(config["Server Settings"]["welcome_message"])
+host_name = str(config["Server Settings"]["host_name"])
+server_password = str(config["Server Settings"]["password"])
+max_players = int(config["Server Settings"]["max_players"])
+# Plugin Settings
+server_plugins_required = bool(int(config["Plugin Settings"]["server_plugins_required"]))
+server_plugins_list = str(config["Plugin Settings"]["server_plugin_list"])
 
 # Map file
 map_file_name = "ctf_eiger"
-
-# Max connected players
-max_players = 5
-
-# Server password
-server_password = ""
-
-# Server player name
-host_name = "Host"
-
-# Server plugins
-server_plugins_required = False
-server_plugins_list = ""
 
 #Frame/Tick Variables
 delta_factor = 1
