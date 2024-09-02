@@ -180,6 +180,166 @@ class objectMask:
         self.height = height
 
 
+class JoiningPlayer:
+    def __init__(self, connection):
+        self.conn = connection
+        self.client_player = None
+        self.new_state = STATE_EXPECT_HELLO
+        self.state = self.new_state
+        print(
+            "Connections:"
+            f"{len(joining_players) + len(player_list) - 1}\n"
+        )
+        
+    def service_connection(self, gameserver_object):
+        self.conn.settimeout(0)
+        try:
+            data = self.conn.recv(1)
+        except ConnectionResetError:
+            print("New Connection Socket Disconnect")
+            return 1
+        except BlockingIOError:
+            return 0
+        if not data:
+            print("New Connection Socket Disconnect")
+            return 1
+        print("Received New Connection Data")
+        print(data)
+
+        if self.state == STATE_EXPECT_HELLO:
+            if data[0] == HELLO:
+                print("Received Hello")
+                data = self.conn.recv(16)
+                if data[0:16] != PROTOCOL_ID:
+                    print("Incompatible Protocol Received")
+                    to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
+                    self.conn.sendall(to_send)
+                    return 1
+                elif server_password == "":
+                    print("Compatible Protocol Received")
+                    self.state = STATE_CLIENT_AUTHENTICATED
+                else:
+                    print("Compatible Protocol Received")
+                    to_send = struct.pack(">B", PASSWORD_REQUEST)
+                    self.new_state = STATE_EXPECT_PASSWORD
+
+        elif self.state == STATE_EXPECT_PASSWORD:
+            print("bruh")
+            password_length = data[0]
+            data = self.conn.recv(password_length)
+            if str(data[0:password_length].decode('utf-8')) == server_password:
+                print("Received Correct Password")
+                self.state = STATE_CLIENT_AUTHENTICATED
+            else:
+                print("Received Wrong Password")
+                to_send = struct.pack(">B", PASSWORD_WRONG)
+                self.conn.sendall(to_send)
+                return 1
+        
+        if self.state == STATE_CLIENT_AUTHENTICATED:
+            print("Client Authenticated")
+            # Assembles Response to authenticated client
+            to_send = struct.pack(">B", HELLO)
+            to_send += struct.pack(">B", len(server_name))  # Server name length
+            to_send += bytes(server_name, "utf-8")  # Server name
+            to_send += struct.pack(">B", len(map_file_name))  # Map name length
+            to_send += bytes(map_file_name, "utf-8")  # Map name
+            to_send += struct.pack(">B", 0)  # Map md5 length
+            to_send += bytes("", "utf-8")  # Map md5
+
+            plugins_md5_list = ""
+            if len(server_plugins_list) > 1:
+                plugins_list = list(server_plugins_list.split(", "))
+                for plugin_name in plugins_list:
+                    if len(plugins_md5_list) > 0:
+                        plugins_md5_list += ","
+                    plugins_md5_list += plugin_name + "@" + (urllib.request.urlopen("http://www.ganggarrison.com/plugins/" + plugin_name + ".md5").read().decode('utf-8'))
+            
+            to_send += struct.pack(">B", int(server_plugins_required))  # Server plugins required?
+            to_send += struct.pack("<H", len(plugins_md5_list))  # Plugin list length
+            to_send += bytes(plugins_md5_list, "utf-8")  # Plugin list
+            self.new_state = STATE_EXPECT_COMMAND
+
+        elif self.state == STATE_EXPECT_COMMAND:  
+            if data[0] == PING:
+                pass
+
+            elif data[0] == RESERVE_SLOT:
+                print("Received Reserve Slot")
+                # Generates player ID for new player
+                client_player_id = random.randint(1000, 9999)
+                while(client_player_id in player_list):
+                    client_player_id = random.randint(1000, 9999)
+
+                name_length = self.conn.recv(1)[0]
+                data = self.conn.recv(name_length)
+                # playerID, playerName, playerTeam, playerClass
+                self.client_player = Player(
+                    self.conn,
+                    int(client_player_id),
+                    str(data[0:name_length].decode('utf-8')),
+                    TEAM_SPECTATOR,
+                    CLASS_SCOUT,
+                )
+                # Assembles Response
+                if (len(player_list) - 1) < max_players:
+                    print("Slot Reserved")
+                    to_send = struct.pack(">B", RESERVE_SLOT)
+                else:
+                    print("Server Full")
+                    to_send = struct.pack(">B", SERVER_FULL)
+                    self.conn.sendall(to_send)
+                    return 1
+
+            elif data[0] == PLAYER_JOIN:
+                print("Received Player Join")
+                # Writes JOIN_UPDATE with num of players and map area
+                to_send = struct.pack(">B", JOIN_UPDATE)
+                to_send += struct.pack(">B", len(player_list))
+                to_send += struct.pack(">B", 1)
+
+                # Writes the current map n stuff
+                to_send += struct.pack(">B", CHANGE_MAP)
+                to_send += struct.pack(">B", len(map_file_name))  # Map name length
+                to_send += bytes(map_file_name, "utf-8")  # Map name
+                to_send += struct.pack(">B", 0)  # Map md5 length
+                to_send += bytes("", "utf-8")  # Map md5
+
+                # Player joining n stuff
+                for player_index, joining_player in enumerate(player_list):
+                    to_send += struct.pack(">B", PLAYER_JOIN)
+                    to_send += struct.pack(">B", len(joining_player.name))
+                    to_send += bytes(joining_player.name, "utf-8")
+                    # Set player class
+                    to_send += struct.pack(">B", PLAYER_CHANGECLASS)
+                    to_send += struct.pack(">B", player_index)
+                    to_send += struct.pack(">B", joining_player._class)
+                    # Sets player team
+                    to_send += struct.pack(">B", PLAYER_CHANGETEAM)
+                    to_send += struct.pack(">B", player_index)
+                    to_send += struct.pack(">B", joining_player.team)
+                # Writes FULL_UPDATE stuff
+                to_send += gameserver_object.serialize_state(FULL_UPDATE)
+
+                player_list.append(self.client_player)
+                # Server Player Join
+                gameserver_object.server_to_send += struct.pack(">B", PLAYER_JOIN)
+                gameserver_object.server_to_send += struct.pack(">B", len(self.client_player.name))
+                gameserver_object.server_to_send += bytes(self.client_player.name, "utf-8")
+
+                # Server Message
+                to_send += struct.pack(">B", MESSAGE_STRING)
+                to_send += struct.pack(">B", len(welcome_message))
+                to_send += bytes(welcome_message, "utf-8")
+                print("Sent New Connection Data Back")
+                self.conn.sendall(to_send)
+                print("Connection setup complete")
+                server_registration()
+                return 1
+        print("Sent New Connection Data Back")
+        self.conn.sendall(to_send)
+        self.state = self.new_state
+    
 class Player:
     def __init__(self, connection, _id, name, team, _class):
         self._id = _id
@@ -835,13 +995,6 @@ class GameServer:
         self.server_to_send = bytes("", "utf-8")
         self.new_connections = [];
 
-    def add_connection(self, conn, addr):
-        self.new_connections.append(conn)
-        print(
-            "Connections:"
-            f"{len(self.new_connections) + len(player_list) - 1}\n"
-        )
-
     def serialize_state(self, update_type):
         to_send = struct.pack(">B", update_type)
 
@@ -883,7 +1036,7 @@ class GameServer:
                     # Input & Aiming
                     to_send += struct.pack(">B", joining_player.character_object.key_state)
                     to_send += struct.pack("<H", joining_player.character_object.net_aim_direction)
-                    to_send += struct.pack(">B", int(joining_player.character_object.aim_distance/2))
+                    to_send += struct.pack(">B", int(round(joining_player.character_object.aim_distance/2)))
                     
                     if update_type == QUICK_UPDATE or update_type == FULL_UPDATE:
                         to_send += struct.pack("<H", int(round(joining_player.character_object.x*5)))
@@ -944,149 +1097,6 @@ class GameServer:
             to_send += struct.pack(">B", 255)
 
         return to_send
-
-    def join_player(self, conn):
-        new_state = STATE_EXPECT_HELLO
-        state = new_state
-        while True:
-            try:
-                data = conn.recv(1024)
-            except ConnectionResetError:
-                print("New Connection Socket Disconnect")
-                break
-            if not data:
-                print("New Connection Socket Disconnect")
-                break
-            print("Received New Connection Data")
-            print(data)
-
-            if state == STATE_EXPECT_HELLO:
-                if data[0] == HELLO:
-                    print("Received Hello")
-                    if data[1:17] != PROTOCOL_ID:
-                        print("Incompatible Protocol Received")
-                        to_send = struct.pack(">B", INCOMPATIBLE_PROTOCOL)
-                        conn.sendall(to_send)
-                        break
-                    elif server_password == "":
-                        print("Compatible Protocol Received")
-                        state = STATE_CLIENT_AUTHENTICATED
-                    else:
-                        print("Compatible Protocol Received")
-                        to_send = struct.pack(">B", PASSWORD_REQUEST)
-                        new_state = STATE_EXPECT_PASSWORD
-
-            if state == STATE_EXPECT_PASSWORD:
-                if str(data[1:data[0] + 1].decode('utf-8')) == server_password:
-                    print("Received Correct Password")
-                    state = STATE_CLIENT_AUTHENTICATED
-                else:
-                    print("Received Wrong Password")
-                    to_send = struct.pack(">B", PASSWORD_WRONG)
-                    conn.sendall(to_send)
-                    break;
-            
-            if state == STATE_CLIENT_AUTHENTICATED:
-                print("Client Authenticated")
-                # Assembles Response to authenticated client
-                to_send = struct.pack(">B", HELLO)
-                to_send += struct.pack(">B", len(server_name))  # Server name length
-                to_send += bytes(server_name, "utf-8")  # Server name
-                to_send += struct.pack(">B", len(map_file_name))  # Map name length
-                to_send += bytes(map_file_name, "utf-8")  # Map name
-                to_send += struct.pack(">B", 0)  # Map md5 length
-                to_send += bytes("", "utf-8")  # Map md5
-
-                plugins_md5_list = ""
-                if len(server_plugins_list) > 1:
-                    plugins_list = list(server_plugins_list.split(", "))
-                    for plugin_name in plugins_list:
-                        if len(plugins_md5_list) > 0:
-                            plugins_md5_list += ","
-                        plugins_md5_list += plugin_name + "@" + (urllib.request.urlopen("http://www.ganggarrison.com/plugins/" + plugin_name + ".md5").read().decode('utf-8'))
-                
-                to_send += struct.pack(">B", int(server_plugins_required))  # Server plugins required?
-                to_send += struct.pack("<H", len(plugins_md5_list))  # Plugin list length
-                to_send += bytes(plugins_md5_list, "utf-8")  # Plugin list
-                new_state = STATE_EXPECT_COMMAND
-
-            elif state == STATE_EXPECT_COMMAND:  
-                if data[0] == PING:
-                    pass
-
-                elif data[0] == RESERVE_SLOT:
-                    print("Received Reserve Slot")
-                    # Generates player ID for new player
-                    client_player_id = random.randint(1000, 9999)
-                    while(client_player_id in player_list):
-                        client_player_id = random.randint(1000, 9999)
-                    # playerID, playerName, playerTeam, playerClass
-                    client_player = Player(
-                        conn,
-                        int(client_player_id),
-                        str(data[2:data[1] + 2].decode('utf-8')),
-                        TEAM_SPECTATOR,
-                        CLASS_SCOUT,
-                    )
-                    # Assembles Response
-                    if (len(player_list) - 1) < max_players:
-                        print("Slot Reserved")
-                        to_send = struct.pack(">B", RESERVE_SLOT)
-                    else:
-                        print("Server Full")
-                        to_send = struct.pack(">B", SERVER_FULL)
-                        conn.sendall(to_send)
-                        break
-
-                elif data[0] == PLAYER_JOIN:
-                    print("Received Player Join")
-                    # Writes JOIN_UPDATE with num of players and map area
-                    to_send = struct.pack(">B", JOIN_UPDATE)
-                    to_send += struct.pack(">B", len(player_list))
-                    to_send += struct.pack(">B", 1)
-
-                    # Writes the current map n stuff
-                    to_send += struct.pack(">B", CHANGE_MAP)
-                    to_send += struct.pack(">B", len(map_file_name))  # Map name length
-                    to_send += bytes(map_file_name, "utf-8")  # Map name
-                    to_send += struct.pack(">B", 0)  # Map md5 length
-                    to_send += bytes("", "utf-8")  # Map md5
-
-                    # Player joining n stuff
-                    for player_index, joining_player in enumerate(player_list):
-                        to_send += struct.pack(">B", PLAYER_JOIN)
-                        to_send += struct.pack(">B", len(joining_player.name))
-                        to_send += bytes(joining_player.name, "utf-8")
-                        # Set player class
-                        to_send += struct.pack(">B", PLAYER_CHANGECLASS)
-                        to_send += struct.pack(">B", player_index)
-                        to_send += struct.pack(">B", joining_player._class)
-                        # Sets player team
-                        to_send += struct.pack(">B", PLAYER_CHANGETEAM)
-                        to_send += struct.pack(">B", player_index)
-                        to_send += struct.pack(">B", joining_player.team)
-                    # Writes FULL_UPDATE stuff
-                    to_send += self.serialize_state(FULL_UPDATE)
-
-                    player_list.append(client_player)
-                    # Server Player Join
-                    self.server_to_send += struct.pack(">B", PLAYER_JOIN)
-                    self.server_to_send += struct.pack(">B", len(client_player.name))
-                    self.server_to_send += bytes(client_player.name, "utf-8")
-
-                    # Server Message
-                    to_send += struct.pack(">B", MESSAGE_STRING)
-                    to_send += struct.pack(">B", len(welcome_message))
-                    to_send += bytes(welcome_message, "utf-8")
-                    print("Sent New Connection Data Back")
-                    conn.sendall(to_send)
-                    print("Connection setup complete")
-                    server_registration()
-                    break
-            print("Sent New Connection Data Back")
-            conn.sendall(to_send)
-            state = new_state
-        self.new_connections.remove(conn)
 
     def process_client_commands(self, player_to_service):
         conn = player_to_service.connection
@@ -1319,8 +1329,10 @@ class GameServer:
             self.server_to_send = bytes("", "utf-8")
 
             # Joins one new player each loop
-            if self.new_connections:
-                self.join_player(self.new_connections[0])            
+            for joining_player in joining_players:
+                if joining_player.service_connection(self):
+                    # Player either joined succesfully or failed to connect
+                    joining_players.remove(joining_player)
 
 
 
@@ -1329,6 +1341,7 @@ class GameServer:
 # --------------------------------------------------------------------------
 # Creates list for players
 player_list = [Player(None, 1000, host_name, TEAM_SPECTATOR, CLASS_SCOUT)]
+joining_players = []
 players_to_remove = []
 
 
@@ -1391,9 +1404,9 @@ REG_PACKET_ONE += struct.pack(
     170,
     167,
 )  # Lobby ID
-REG_PACKET_ONE += struct.pack(">B", 0)           # Connection Type (UDP or TCP)
-REG_PACKET_ONE += struct.pack(">H", SERVER_PORT) # Hosting Port
-REG_PACKET_ONE += struct.pack(">H", 5)           # Player Limit
+REG_PACKET_ONE += struct.pack(">B", 0)            # Connection Type (UDP or TCP)
+REG_PACKET_ONE += struct.pack(">H", SERVER_PORT)  # Hosting Port
+REG_PACKET_ONE += struct.pack(">H", max_players)  # Player Limit
 
 # Registration Packet 2
 REG_PACKET_TWO = struct.pack(">H", 7) # Amount of Value Groups
@@ -1501,7 +1514,9 @@ def main():
         while True:
             conn, addr = s.accept()
             print("Accepted connection from", addr)
-            game_server.add_connection(conn, addr)
+            #game_server.add_connection(conn, addr)
+            joining_client = JoiningPlayer(conn)
+            joining_players.append(joining_client)
 
 
 if __name__ == "__main__":
