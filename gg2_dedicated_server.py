@@ -1178,6 +1178,38 @@ class GameServer:
                     player_to_service.character_object.released_keys |= ~player_to_service.character_object.key_state & player_to_service.character_object.last_key_state
                     player_to_service.character_object.last_key_state = player_to_service.character_object.key_state
 
+            elif data[0] == CHAT_BUBBLE:
+                bubble_image = conn.recv(1)[0]
+                self.server_to_send += struct.pack(">B", CHAT_BUBBLE)
+                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
+                self.server_to_send += struct.pack(">B", bubble_image)
+
+            elif data[0] == OMNOMNOMNOM:
+                if player_to_service.character_object is not None:
+                    if (not player_to_service.humiliated
+                    and not player_to_service.character_object.taunting
+                    and not player_to_service.character_object.omnomnomnom
+                    and player_to_service.character_object.can_eat
+                    and player_to_service._class == CLASS_HEAVY):
+                        self.server_to_send += struct.pack(">B", OMNOMNOMNOM)
+                        self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
+                        # Thing needs to happen here
+
+            elif data[0] == TOGGLE_ZOOM:
+                if player_to_service.character_object is not None:
+                    if player_to_service._class == CLASS_SNIPER:
+                        self.server_to_send += struct.pack(">B", TOGGLE_ZOOM)
+                        self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
+                        # Thing needs to happen here
+
+            elif data[0] == PLAYER_CHANGENAME:
+                name_length = conn.recv(1)[0]
+                name = str(conn.recv(name_length).decode('utf-8'))
+                self.server_to_send += struct.pack(">B", PLAYER_CHANGENAME)
+                self.server_to_send += struct.pack(">B", player_list.index(player_to_service))
+                self.server_to_send += struct.pack(">B", name_length)
+                self.server_to_send += bytes(name, "utf-8")
+                
             else:
                 print("Not yet added thing")
                 print(struct.unpack(">B", data))
