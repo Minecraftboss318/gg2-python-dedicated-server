@@ -224,7 +224,6 @@ class JoiningPlayer:
                     self.new_state = STATE_EXPECT_PASSWORD
 
         elif self.state == STATE_EXPECT_PASSWORD:
-            print("bruh")
             password_length = data[0]
             data = self.conn.recv(password_length)
             if str(data[0:password_length].decode('utf-8')) == server_password:
@@ -976,18 +975,71 @@ class GG2Map:
         self.wm_collision_rects = gg2_map_data[1]
 
         # GG2 map's collision entities
-        self.redspawns = []
-        self.bluespawns = []
+        self.red_spawns = []
+        self.blue_spawns = []
+        self.setup_gates = []
         self.intels = [None, None]
+        self.generators = [None, None]
+        self.arena_control_point = None
+        self.koth_control_point = None
+        self.dkoth_control_points = [None, None]
+        self.control_point_one = []
+        self.control_point_two = []
+
+        # Assign found entities
         for entity in gg2_map_data[0]:
-            if entity.type == "redintel":
+            if entity.type == "redspawn":
+                self.red_spawns.append(entity)
+            elif entity.type == "bluespawn":
+                self.blue_spawns.append(entity)
+
+            elif entity.type == "SetupGate":
+                self.setup_gates.append(entity)
+                
+            elif entity.type == "redintel":
                 self.intels[0] = entity
             elif entity.type == "blueintel":
                 self.intels[1] = entity
-            elif entity.type == "redspawn":
-                self.redspawns.append(entity)
-            elif entity.type == "bluespawn":
-                self.bluespawns.append(entity)
+
+            elif entity.type == "GeneratorRed":
+                self.generators[0] = entity
+            elif entity.type == "GeneratorBlue":
+                self.generators[1] = entity
+
+            elif entity.type == "ArenaControlPoint":
+                self.arena_control_point = entity
+
+            elif entity.type == "KothControlPoint":
+                self.koth_control_point = entity
+
+            elif entity.type == "KothRedControlPoint":
+                self.dkoth_control_points[0] = entity
+            elif entity.type == "KothBlueControlPoint":
+                self.dkoth_control_points[1] = entity
+
+            elif entity.type == "controlPoint1":
+                self.control_point_one.append(entity)
+            elif entity.type == "controlPoint2":
+                self.control_point_two.append(entity)
+
+        # Figure out what HUD to use
+        if self.intels != [None, None]:
+            if len(self.setup_gates) > 0:
+                self.hud_type = "InvasionHUD"
+            else:
+                self.hud_type = "CTFHUD"
+        elif self.generators != [None, None]:
+            self.hud_type = "GeneratorHUD"
+        elif self.arena_control_point is not None:
+            self.hud_type = "ArenaHUD"
+        elif self.koth_control_point is not None:        
+            self.hud_type = "KothHUD"
+        elif self.dkoth_control_points != [None, None]:        
+            self.hud_type = "DKothHUD"
+        elif len(self.control_point_one) > 0 or len(self.control_point_two) > 0:
+            self.hud_type = "ControlPointHUD"
+        else:
+            self.hud_type = "TeamDeathmatchHUD"
 
 
 class GameServer:
@@ -1066,35 +1118,98 @@ class GameServer:
                     to_send += struct.pack(">B", 0)
 
         if update_type == FULL_UPDATE:
-            # Red Intel
-            to_send += struct.pack("<H", 1)
-            to_send += struct.pack("<H", loaded_map.intels[0].x*5)
-            to_send += struct.pack("<H", loaded_map.intels[0].y*5)
-            to_send += struct.pack("<h", -1)
-            # Blue Intel
-            to_send += struct.pack("<H", 1)
-            to_send += struct.pack("<H", loaded_map.intels[1].x*5)
-            to_send += struct.pack("<H", loaded_map.intels[1].y*5)
-            to_send += struct.pack("<h", -1)
+            if loaded_map.intels[0] is not None:
+                # Red Intel
+                to_send += struct.pack("<H", 1)
+                to_send += struct.pack("<H", loaded_map.intels[0].x*5)
+                to_send += struct.pack("<H", loaded_map.intels[0].y*5)
+                to_send += struct.pack("<h", -1)
+            else:
+                to_send += struct.pack("<H", 0)
+            if loaded_map.intels[1] is not None:
+                # Blue Intel
+                to_send += struct.pack("<H", 1)
+                to_send += struct.pack("<H", loaded_map.intels[1].x*5)
+                to_send += struct.pack("<H", loaded_map.intels[1].y*5)
+                to_send += struct.pack("<h", -1)
+            else:
+                to_send += struct.pack("<H", 0)
             # Cap limit, red caps, blue caps, server respawn time
             to_send += struct.pack(">B", 3)
             to_send += struct.pack(">B", 0)
             to_send += struct.pack(">B", 0)
             to_send += struct.pack(">B", 5)
-            # CTF HUD
-            to_send += struct.pack(">B", 15)
-            to_send += struct.pack("<I", 25000)
+            # HUD Networking
+            if loaded_map.hud_type == "InvasionHUD":
+                # Invasion HUD
+                to_send += struct.pack(">B", 15)
+                to_send += struct.pack("<I", 25000)
+                to_send += struct.pack("<H", 120)
+            elif loaded_map.hud_type == "CTFHUD":
+                # CTF HUD
+                to_send += struct.pack(">B", 15)
+                to_send += struct.pack("<I", 25000)
+            elif loaded_map.hud_type == "GeneratorHUD":
+                # Generator HUD
+                to_send += struct.pack(">B", 15)
+                to_send += struct.pack("<I", 25000)
+                # Blue Gen
+                to_send += struct.pack("<H", 2100)
+                to_send += struct.pack("<H", 300)
+                # Red Gen
+                to_send += struct.pack("<H", 2100)
+                to_send += struct.pack("<H", 300)
+            elif loaded_map.hud_type == "ArenaHUD":
+                # Arena HUD
+                if update_type == FULL_UPDATE:
+                    to_send += struct.pack(">B", 0)
+                    to_send += struct.pack(">B", 0)
+                    to_send += struct.pack(">B", 0)
+                    to_send += struct.pack(">b", 2)
+                    to_send += struct.pack("<H", 0)
+                to_send += struct.pack(">B", 15)
+                to_send += struct.pack("<I", 25000)
+                to_send += struct.pack("<H", 1800)
+                to_send += struct.pack(">B", 0)
+
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack("<H", 0)
+            elif loaded_map.hud_type == "KothHUD":
+                # Koth HUD
+                to_send += struct.pack("<H", 900)
+                to_send += struct.pack("<H", 5400)
+                to_send += struct.pack("<H", 5400)
+
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack("<H", 0)
+            elif loaded_map.hud_type == "DKothHUD":
+                # Dkoth HUD
+                to_send += struct.pack("<H", 900)
+                to_send += struct.pack("<H", 5400)
+                to_send += struct.pack("<H", 5400)
+
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack("<H", 0)
+
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack(">b", -1)
+                to_send += struct.pack("<H", 0)
+            elif loaded_map.hud_type == "ControlPointHUD":
+                # Control Point HUD
+                # Not doing this in this style
+                pass
+            elif loaded_map.hud_type == "TeamDeathmatchHUD":
+                # Team Death Match HUD
+                to_send += struct.pack(">B", 15)
+                to_send += struct.pack("<I", 25000)
+                to_send += struct.pack("<H", 1)
+
             # Classlimits
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
-            to_send += struct.pack(">B", 255)
+            for x in range(10):
+                to_send += struct.pack(">B", 255)
 
         return to_send
 
@@ -1257,23 +1372,23 @@ class GameServer:
             )
             
             if player_to_service.team == TEAM_RED:
-                random_spawn = random.randint(0, len(loaded_map.redspawns) - 1)
+                random_spawn = random.randint(0, len(loaded_map.red_spawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning red player locally
-                player_to_service.character_object.x = loaded_map.redspawns[
+                player_to_service.character_object.x = loaded_map.red_spawns[
                     random_spawn
                 ].x
-                player_to_service.character_object.y = loaded_map.redspawns[
+                player_to_service.character_object.y = loaded_map.red_spawns[
                     random_spawn
                 ].y
             elif player_to_service.team == TEAM_BLUE:
-                random_spawn = random.randint(0,len(loaded_map.bluespawns) - 1)
+                random_spawn = random.randint(0,len(loaded_map.blue_spawns) - 1)
                 self.server_to_send += struct.pack(">B", random_spawn)
                 # Spawning blue player locally
-                player_to_service.character_object.x = loaded_map.bluespawns[
+                player_to_service.character_object.x = loaded_map.blue_spawns[
                     random_spawn
                 ].x
-                player_to_service.character_object.y = loaded_map.bluespawns[
+                player_to_service.character_object.y = loaded_map.blue_spawns[
                     random_spawn
                 ].y
             self.server_to_send += struct.pack(">B", 0)
@@ -1546,7 +1661,6 @@ def main():
         while True:
             conn, addr = s.accept()
             print("Accepted connection from", addr)
-            #game_server.add_connection(conn, addr)
             joining_client = JoiningPlayer(conn)
             joining_players.append(joining_client)
 
