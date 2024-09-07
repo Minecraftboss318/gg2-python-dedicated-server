@@ -327,9 +327,10 @@ class JoiningPlayer:
                 gameserver_object.server_to_send += bytes(self.client_player.name, "utf-8")
 
                 # Server Message
-                to_send += struct.pack(">B", MESSAGE_STRING)
-                to_send += struct.pack(">B", len(welcome_message))
-                to_send += bytes(welcome_message, "utf-8")
+                if len(welcome_message) > 0:
+                    to_send += struct.pack(">B", MESSAGE_STRING)
+                    to_send += struct.pack(">B", len(welcome_message))
+                    to_send += bytes(welcome_message, "utf-8")
                 print("Sent New Connection Data Back")
                 self.conn.sendall(to_send)
                 print("Connection setup complete")
@@ -1408,7 +1409,8 @@ class GameServer:
             # Removes players from server
             if len(players_to_remove) > 0:
                 for player in players_to_remove:
-                    self.server_to_send += player.leave_server()
+                    if player in player_list:
+                        self.server_to_send += player.leave_server()
                 server_registration()
 
             if len(player_list) > 1:
