@@ -516,10 +516,10 @@ class Character:
         rect2_height = self.character_mask.height
         
         for rect1 in loaded_map.wm_collision_rects:
-            if (rect1.x < rect2_x + rect2_width and
-                    rect1.x + rect1.width > rect2_x and
-                    rect1.y < rect2_y + rect2_height and
-                    rect1.y + rect1.height > rect2_y):
+            if (rect1.x <= rect2_x + rect2_width and
+                    rect1.x + rect1.width >= rect2_x and
+                    rect1.y <= rect2_y + rect2_height and
+                    rect1.y + rect1.height >= rect2_y):
                 collisions.append(rect1)
         if(len(collisions) > 0):
             return False
@@ -846,7 +846,7 @@ class Character:
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
+        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33  Works: -5.5, -9.5, 12, 33
         self.base_run_power = 1.4
         self.max_hp = 100
         self.weapons = ["Scattergun"]  # Temp Value
@@ -1445,12 +1445,10 @@ class GameServer:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
                             
-            # Make sure server is 30 updates a second
-            compute_time = time.time() - start_time
-            if(compute_time < (1/30)):
-                time.sleep((1/30) - compute_time)
-            else:
-                print("Server update was long")
+            # Make sure server updates 30 times a second
+            time.sleep(max(0, ((1/30) - (time.time() - start_time) - 0.001)))
+            while 0 <= (1/30) - (time.time() - start_time):
+                pass
 
             start_time = time.time()
 
