@@ -400,12 +400,11 @@ class Player:
         elif self._class == CLASS_QUOTE:
             self.character_object = Quote(self)
 
-        to_send = BytesIO()
-        to_send.write(struct.pack(">BB", PLAYER_SPAWN, player_list.index(self)))
+        game_server.server_to_send.write(struct.pack(">BB", PLAYER_SPAWN, player_list.index(self)))
         
         if self.team == TEAM_RED:
             random_spawn = np.random.randint(0, len(loaded_map.red_spawns))
-            to_send.write(struct.pack(">B", random_spawn))
+            game_server.server_to_send.write(struct.pack(">B", random_spawn))
             # Spawning red player locally
             self.character_object.x = loaded_map.red_spawns[
                 random_spawn
@@ -415,7 +414,7 @@ class Player:
             ].y
         elif self.team == TEAM_BLUE:
             random_spawn = np.random.randint(0,len(loaded_map.blue_spawns))
-            to_send.write(struct.pack(">B", random_spawn))
+            game_server.server_to_send.write(struct.pack(">B", random_spawn))
             # Spawning blue player locally
             self.character_object.x = loaded_map.blue_spawns[
                 random_spawn
@@ -423,17 +422,14 @@ class Player:
             self.character_object.y = loaded_map.blue_spawns[
                 random_spawn
             ].y
-        to_send.write(struct.pack(">B", 0))
+        game_server.server_to_send.write(struct.pack(">B", 0))
         print("Spawned Player")
-        return to_send.getvalue()
 
     def leave_server(self):
-        to_send = BytesIO()
-        to_send.write(struct.pack(">BB", PLAYER_LEAVE, player_list.index(self)))
+        game_server.server_to_send.write(struct.pack(">BB", PLAYER_LEAVE, player_list.index(self)))
         player_list.remove(self)
         players_to_remove.remove(self)
         print("Player Socket Disconnect")
-        return to_send.getvalue()
 
 
 class Character:
@@ -733,7 +729,6 @@ class Character:
 
 
     def begin_step(self):
-        to_send = BytesIO()
         stuck_in_wall = not self.place_free(self.x, self.y)
         obstacle_below = not self.place_free(self.x, self.y+1)
         on_ground = False
@@ -763,7 +758,7 @@ class Character:
 
         if not self.taunting and not self.omnomnomnom:
             if not self.player_object.humiliated and num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x10):
-                to_send.write(self.current_weapon.fire_weapon())
+                self.current_weapon.fire_weapon()
             if not self.player_object.humiliated and self.pressed_keys & 0x01:
                 # Taunting Stuff
                 if False:
@@ -836,7 +831,6 @@ class Character:
             else:
                 self.applied_gravity += 0.6
 
-        return to_send.getvalue()
 
     def normal_step(self):
         self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
@@ -1082,13 +1076,13 @@ class Scattergun(Weapon):
         if self.ready_to_shoot and self.ammo_count > 0:
             seed = np.random.randint(0, 65536)
 
-            to_send.write(struct.pack("<BBHHbbH",
+            game_server.server_to_send.write(struct.pack("<BBHHbbH",
                 WEAPON_FIRE,
                 player_list.index(self.owner_player),
                 round(self.owner.x*5),
                 round(self.owner.y*5),
-                round(self.owner.hspeed*5),
-                round(self.owner.vspeed*5),
+                round(self.owner.hspeed*8.5),
+                round(self.owner.vspeed*8.5),
                 seed))
 
             rng = np.random.RandomState(seed)
@@ -1098,8 +1092,6 @@ class Scattergun(Weapon):
             self.ready_to_shoot_alarm = self.refire_time / delta_factor
             self.reload_alarm = (self.reload_buffer + self.reload_time) / delta_factor
             #print("Weapon Fired")
-
-        return to_send.getvalue()
 
 
 class GG2Map:
@@ -1455,7 +1447,7 @@ class GameServer:
                              or player_to_service.team == TEAM_BLUE)
                         and (0 <= player_to_service._class
                              and player_to_service._class <= 9)):
-                    self.server_to_send.write(player_to_service.respawn())
+                    player_to_service.respawn()
 
                 if player_to_service.character_object is not None:
                     player_to_service.character_object.current_weapon.reload_alarm -= 1
@@ -1482,7 +1474,7 @@ class GameServer:
             if players_to_remove:
                 for player in players_to_remove:
                     if player in player_list:
-                        self.server_to_send.write(player.leave_server())
+                        player.leave_server()
                 server_registration()
 
             if len(player_list) > 1:
@@ -1492,16 +1484,18 @@ class GameServer:
                         self.process_client_commands(player_to_service)
 
                 # Send players server update
+                test_time = time.time()
                 if (frame % 7) == 0:
                     self.server_to_send.write(self.serialize_state(QUICK_UPDATE))
                 else:
                     self.server_to_send.write(self.serialize_state(INPUTSTATE))
+                #print(time.time() - test_time)
                     
                 # Begin step collisions
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
                         if player_to_service.character_object is not None:
-                            self.server_to_send.write(player_to_service.character_object.begin_step())
+                            player_to_service.character_object.begin_step()
                     
                 # Alarm Updating
                 self.process_client_alarms()
@@ -1527,6 +1521,7 @@ class GameServer:
 
             start_time = time.time()
 
+            #temp_time = time.time()
             # Sends update to all players
             if self.server_to_send:
                 for player_to_service in player_list:
@@ -1544,6 +1539,7 @@ class GameServer:
                             print("Broken Pipe Error")
                         except TimeoutError:
                             print("Server Send Timeout???")
+            #print(time.time() - temp_time)
                         
             # Clears data to send
             self.server_to_send = BytesIO()
@@ -1718,6 +1714,7 @@ def main():
     loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_name + ".png"))
 
     # Start Game Server
+    global game_server
     game_server = GameServer()
     server_networking_thread = threading.Thread(
         target = GameServer.run_game_server_networking,
@@ -1728,6 +1725,7 @@ def main():
     time.sleep(0.05)
     # Listens for connections and starts a thread to handle them
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         s.bind(("", SERVER_PORT))
         s.listen()
         print(f"Listening on port {SERVER_PORT}")
