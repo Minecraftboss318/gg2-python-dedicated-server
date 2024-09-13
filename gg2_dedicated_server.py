@@ -1,6 +1,7 @@
 import struct
 import socket
 import time
+from time import perf_counter_ns
 import threading
 import numpy as np
 import upnpy
@@ -146,6 +147,11 @@ def upnp_exit():
     )
 
 
+def wait_us(delay):
+    target = perf_counter_ns() + delay * 1000
+    while perf_counter_ns() < target:
+        pass
+
 def hex_as_int(input_value):
     return int(hex(input_value), 16)
 
@@ -283,6 +289,8 @@ class JoiningPlayer:
                     TEAM_SPECTATOR,
                     CLASS_SCOUT,
                 )
+                # Making sure this is actually set
+                self.client_player.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 # Assembles Response
                 if (len(player_list) - 1) < max_players:
                     print("Slot Reserved")
@@ -1236,8 +1244,9 @@ class GameServer:
                         to_send.write(struct.pack("<h", joining_player.character_object.intel_recharge))
 
                         # Temp Weapon Values
-                        to_send.write(struct.pack(">BB", joining_player.character_object.current_weapon.ready_to_shoot,
-                            joining_player.character_object.current_weapon.ready_to_shoot_alarm))
+                        to_send.write(struct.pack("<BB",
+                            max(int(joining_player.character_object.current_weapon.ready_to_shoot), 0),
+                            max(int(joining_player.character_object.current_weapon.ready_to_shoot_alarm), 0)))
                         
                 else:
                     # Subobject count
@@ -1440,7 +1449,8 @@ class GameServer:
         for player_to_service in player_list:
             if player_to_service._id != 1000:
                 # Respawn Alarm
-                player_to_service.respawn_timer -= 1
+                if player_to_service.respawn_timer > 0:
+                    player_to_service.respawn_timer -= 1
                 if (player_to_service.respawn_timer <= 0
                         and player_to_service.character_object is None
                         and (player_to_service.team == TEAM_RED
@@ -1450,11 +1460,13 @@ class GameServer:
                     player_to_service.respawn()
 
                 if player_to_service.character_object is not None:
-                    player_to_service.character_object.current_weapon.reload_alarm -= 1
+                    if player_to_service.character_object.current_weapon.reload_alarm > 0:
+                        player_to_service.character_object.current_weapon.reload_alarm -= 1
                     if player_to_service.character_object.current_weapon.reload_alarm <= 0:
                         player_to_service.character_object.current_weapon.reload()
 
-                    player_to_service.character_object.current_weapon.ready_to_shoot_alarm -= 1
+                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm > 0:
+                        player_to_service.character_object.current_weapon.ready_to_shoot_alarm -= 1
                     if player_to_service.character_object.current_weapon.ready_to_shoot_alarm <= 0:
                         player_to_service.character_object.current_weapon.ready_shooting()
 
@@ -1510,18 +1522,15 @@ class GameServer:
                     if player_to_service._id != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
-                            
+
             # Make sure server updates 30 or 60 times a second
-            if (1/room_speed) - (time.time() - start_time) <= 0:
-                print("Server took a while")
-            #print((1/room_speed) - (time.time() - start_time))
-            time.sleep(max(0, ((1/room_speed) - (time.time() - start_time) - 0.001)))
-            while 0 <= (1/room_speed) - (time.time() - start_time):
-                pass
+            time.sleep(max(0, ((1/room_speed) - (time.time() - start_time) - 0.008))) #0.001 has overruns while 0.01 has high cpu usage
+            if (1/room_speed) - (time.time() - start_time) < 0:
+                print("Server Overran")
+            wait_us(((1/room_speed) - (time.time() - start_time)) * 1000000)
 
             start_time = time.time()
 
-            #temp_time = time.time()
             # Sends update to all players
             if self.server_to_send:
                 for player_to_service in player_list:
@@ -1539,7 +1548,6 @@ class GameServer:
                             print("Broken Pipe Error")
                         except TimeoutError:
                             print("Server Send Timeout???")
-            #print(time.time() - temp_time)
                         
             # Clears data to send
             self.server_to_send = BytesIO()
