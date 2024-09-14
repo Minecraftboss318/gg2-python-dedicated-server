@@ -732,8 +732,8 @@ class Character:
                 self.vspeed = 0
                 vleft = 0
 
-            self.hspeed /= delta_factor
-            self.vspeed /= delta_factor
+        self.hspeed /= delta_factor
+        self.vspeed /= delta_factor
 
 
     def begin_step(self):
