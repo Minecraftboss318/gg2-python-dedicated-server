@@ -147,11 +147,6 @@ def upnp_exit():
     )
 
 
-def wait_us(delay):
-    target = perf_counter_ns() + delay * 1000
-    while perf_counter_ns() < target:
-        pass
-
 def hex_as_int(input_value):
     return int(hex(input_value), 16)
 
@@ -1096,11 +1091,30 @@ class Scattergun(Weapon):
             rng = np.random.RandomState(seed)
             self.ammo_count = max(0, self.ammo_count - 1)
 
+            #for i in range(6):
+            #    bullet = Shot(self, self.owner.x, self.owner.y, self.owner.aim_direction, 13)
+            #    bullet.hspeed += self.owner.hspeed
+                
+
+
             self.ready_to_shoot = False
             self.ready_to_shoot_alarm = self.refire_time / delta_factor
             self.reload_alarm = (self.reload_buffer + self.reload_time) / delta_factor
             #print("Weapon Fired")
 
+class Shot:
+    def __init__(self, x, y, direction, speed):
+        self.x = x
+        self.y = y
+        self.hspeed = 0
+        self.vspeed = 0
+        self.projectile = 7 #DAMAGE_SOURCE_SCATTERGUN
+        self.dir = direction
+        self.speed = speed
+
+        self.owner = None
+        self.owner_player = None
+        self.team = None
 
 class GG2Map:
     def __init__(self, gg2_map_data):
@@ -1524,11 +1538,14 @@ class GameServer:
                             player_to_service.character_object.end_step()
 
             # Make sure server updates 30 or 60 times a second
-            time.sleep(max(0, ((1/room_speed) - (time.time() - start_time) - 0.008))) #0.001 has overruns while 0.01 has high cpu usage
+            time.sleep(max(0, (1/room_speed) - (time.time() - start_time) - 0.008)) #0.001 has overruns while 0.01 has high cpu usage
             if (1/room_speed) - (time.time() - start_time) < 0:
-                print("Server Overran")
-            wait_us(((1/room_speed) - (time.time() - start_time)) * 1000000)
-
+                print("Server Sleep Overrun")
+            while 0.001 < (1/room_speed) - (time.time() - start_time):
+                pass
+            if (1/room_speed) - (time.time() - start_time) < 0:
+                print("Server Update Time Overrun")
+                
             start_time = time.time()
 
             # Sends update to all players
