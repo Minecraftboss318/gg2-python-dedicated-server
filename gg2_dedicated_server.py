@@ -1,7 +1,6 @@
 import struct
 import socket
 import time
-from time import perf_counter_ns
 import threading
 import numpy as np
 import upnpy
@@ -169,6 +168,24 @@ def point_direction(x1, y1, x2, y2):
 
 def degtorad(degrees):
     return degrees * math.pi / 180
+
+def place_free(obj, xPos, yPos):
+    collisions = []
+    rect2_x = xPos + obj.collision_mask.x1
+    rect2_y = yPos + obj.collision_mask.y1
+    rect2_width = obj.collision_mask.width
+    rect2_height = obj.collision_mask.height
+
+    for rect1 in loaded_map.wm_collision_rects:
+        if (rect1.x <= rect2_x + rect2_width and
+                rect1.x + rect1.width >= rect2_x and
+                rect1.y <= rect2_y + rect2_height and
+                rect1.y + rect1.height >= rect2_y):
+            collisions.append(rect1)
+    if collisions:
+        return False
+    else:
+        return True
 
 
 # --------------------------------------------------------------------------
@@ -579,24 +596,6 @@ class Character:
         elif self.player_object._class == CLASS_QUOTE:
             pass
 
-    def place_free(self, xPos, yPos):
-        collisions = []
-        rect2_x = xPos + self.character_mask.x1
-        rect2_y = yPos + self.character_mask.y1
-        rect2_width = self.character_mask.width
-        rect2_height = self.character_mask.height
-        
-        for rect1 in loaded_map.wm_collision_rects:
-            if (rect1.x <= rect2_x + rect2_width and
-                    rect1.x + rect1.width >= rect2_x and
-                    rect1.y <= rect2_y + rect2_height and
-                    rect1.y + rect1.height >= rect2_y):
-                collisions.append(rect1)
-        if collisions:
-            return False
-        else:
-            return True
-
     def move_outside_solid(self, direction, max_dist):
         if direction == 0:
             self.x += max_dist
@@ -627,7 +626,7 @@ class Character:
 
             new_x = self.x + move_x*i/MAX_I
             new_y = self.y + move_y*i/MAX_I
-            if self.place_free(new_x, new_y):
+            if place_free(self, new_x, new_y):
                 total_moved += math.dist([self.x, self.y], [new_x, new_y])
                 self.x = new_x
                 self.y = new_y
@@ -647,10 +646,10 @@ class Character:
         old_y = self.y
         old_hspeed = self.hspeed
         old_vspeed = self.vspeed
-        bbox_height = self.character_mask.height
-        bbox_width = self.character_mask.width
+        bbox_height = self.collision_mask.height
+        bbox_width = self.collision_mask.width
 
-        if not self.place_free(self.x, self.y):
+        if not place_free(self, self.x, self.y):
             self.move_outside_solid(90, bbox_height/2)
             distu = old_y - self.y
             uy = self.y
@@ -680,7 +679,7 @@ class Character:
             else:
                 self.x = lx
             
-            if not self.place_free(self.x, self.y):
+            if not place_free(self, self.x, self.y):
                 self.x = old_x
                 self.y = old_y
 
@@ -702,19 +701,19 @@ class Character:
             hleft -= self.x - prev_x
             vleft -= self.y - prev_y
 
-            if vleft != 0 and not self.place_free(self.x, self.y + sign(vleft)):
+            if vleft != 0 and not place_free(self, self.x, self.y + sign(vleft)):
                 if vleft > 0:
                     self.move_status = 0
                 vleft = 0
                 self.vspeed = 0
                 collision_rectified = True
 
-            if hleft != 0 and not self.place_free(self.x + sign(hleft), self.y):
-                if self.place_free(self.x + sign(hleft), self.y - 6):
+            if hleft != 0 and not place_free(self, self.x + sign(hleft), self.y):
+                if place_free(self, self.x + sign(hleft), self.y - 6):
                     self.y -= 6
                     collision_rectified = True
                     self.move_status = 0
-                elif self.place_free(self.x + sign(hleft), self.y + 6) and abs(self.hspeed) >= abs(self.vspeed):
+                elif place_free(self, self.x + sign(hleft), self.y + 6) and abs(self.hspeed) >= abs(self.vspeed):
                     self.y += 6
                     collision_rectified = True
                     self.move_status = 0
@@ -732,8 +731,8 @@ class Character:
 
 
     def begin_step(self):
-        stuck_in_wall = not self.place_free(self.x, self.y)
-        obstacle_below = not self.place_free(self.x, self.y+1)
+        stuck_in_wall = not place_free(self, self.x, self.y)
+        obstacle_below = not place_free(self, self.x, self.y+1)
         on_ground = False
         on_non_surfing_ground = False
 
@@ -851,7 +850,7 @@ class Character:
         else:
             _test = self._last_xscale < self.image_xscale
 
-        if _test and not self.place_free(self.x + sign(self.hspeed), self.y):
+        if _test and not place_free(self, self.x + sign(self.hspeed), self.y):
             self.spin_jumping = True
         else:
             self.spin_jumping = False
@@ -864,7 +863,7 @@ class Character:
         else:
             _gravity = 0.6
 
-        if self.spin_jumping and self.place_free(self.x, self.y - _gravity) and (self.place_free(self.x, self.y +1) or self.vspeed < 0):
+        if self.spin_jumping and place_free(self, self.x, self.y - _gravity) and (place_free(self, self.x, self.y +1) or self.vspeed < 0):
             self.applied_gravity -= _gravity
         else:
             self.spin_jumping = False
@@ -879,7 +878,7 @@ class Character:
         y_previous = self.y
         x_previous = self.x
 
-        doHit = not self.place_free(self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor)
+        doHit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor)
         if doHit:
             # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
@@ -889,7 +888,7 @@ class Character:
             self.y += self.vspeed * delta_factor
 
         # Fallback?
-        if self.place_free(self.x, self.y + 1):
+        if place_free(self, self.x, self.y + 1):
             self.vspeed += self.applied_gravity*delta_factor/2
         if self.vspeed > 10:
             self.vspeed = 10
@@ -906,18 +905,18 @@ class Character:
 
     def end_step(self):
         if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or False:
-            if self.place_free(self.x, self.y + 6):
-                if not self.place_free(self.x, self.y + 7):
+            if place_free(self, self.x, self.y + 6):
+                if not place_free(self, self.x, self.y + 7):
                     self.y += 6
                 elif math.sqrt((self.hspeed ** 2) + (self.vspeed ** 2)) > 6:
-                    if self.place_free(self.x, self.y + 12):
-                        if not self.place_free(self.x, self.y +13):
+                    if place_free(self, self.x, self.y + 12):
+                        if not place_free(self, self.x, self.y +13):
                             self.y += 12
 
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33  Works: -5.5, -9.5, 12, 33
+        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33  Works: -5.5, -9.5, 12, 33
         self.base_run_power = 1.4
         self.max_hp = 100
         #self.weapons = ["Scattergun"]
@@ -931,7 +930,7 @@ class Scout(Character):
 
 class Soldier(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
+        self.collision_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 160
         #self.weapons = ["Rocketlauncher"]
@@ -943,7 +942,7 @@ class Soldier(Character):
 
 class Sniper(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
+        self.collision_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 120
         #self.weapons = ["Rifle"]
@@ -955,7 +954,7 @@ class Sniper(Character):
 
 class Demoman(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6.5, -9.5, 14, 33) #-7, -10, 14, 33
+        self.collision_mask = objectMask(-6.5, -9.5, 14, 33) #-7, -10, 14, 33
         self.base_run_power = 1
         self.max_hp = 120
         #self.weapons = ["Minegun"]
@@ -967,7 +966,7 @@ class Demoman(Character):
 
 class Medic(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6.5, -7.5, 14, 31) #-7, -8, 14, 31
+        self.collision_mask = objectMask(-6.5, -7.5, 14, 31) #-7, -8, 14, 31
         self.base_run_power = 1.09
         self.max_hp = 120
         #self.weapons = ["Medigun"]
@@ -980,7 +979,7 @@ class Medic(Character):
 
 class Engineer(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33 
+        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33 
         self.base_run_power = 1
         self.max_hp = 120
         #self.weapons = ["Shotgun"]
@@ -992,7 +991,7 @@ class Engineer(Character):
 
 class Heavy(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-8.5, -11.5, 18, 35) #-9, -12, 18, 35
+        self.collision_mask = objectMask(-8.5, -11.5, 18, 35) #-9, -12, 18, 35
         self.base_run_power = 0.8
         self.max_hp = 200
         #self.weapons = ["Minigun"]
@@ -1004,7 +1003,7 @@ class Heavy(Character):
 
 class Spy(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
+        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
         self.base_run_power = 1.08
         self.max_hp = 100
         #self.weapons = ["Revolver"]
@@ -1017,7 +1016,7 @@ class Spy(Character):
 
 class Pyro(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6.5, -5.5, 14, 29) #-7, -6, 14, 29
+        self.collision_mask = objectMask(-6.5, -5.5, 14, 29) #-7, -6, 14, 29
         self.base_run_power = 1.1
         self.max_hp = 120
         #self.weapons = ["Flamethrower"]
@@ -1030,7 +1029,7 @@ class Pyro(Character):
 
 class Quote(Character):
     def __init__(self, player_object):
-        self.character_mask = objectMask(-6.5, -11.5, 14, 23) #-7, -12, 14, 23
+        self.collision_mask = objectMask(-6.5, -11.5, 14, 23) #-7, -12, 14, 23
         self.base_run_power = 1.07
         self.max_hp = 140
         #self.weapons = ["Blade"]
@@ -1091,10 +1090,23 @@ class Scattergun(Weapon):
             rng = np.random.RandomState(seed)
             self.ammo_count = max(0, self.ammo_count - 1)
 
-            #for i in range(6):
-            #    bullet = Shot(self, self.owner.x, self.owner.y, self.owner.aim_direction, 13)
-            #    bullet.hspeed += self.owner.hspeed
+            for i in range(6):
+                bullet = Shot(self.owner.x, self.owner.y, self.owner.aim_direction, 13)
+                bullet.hspeed += self.owner.hspeed
+                # Sets speed and direction based on hspeed and vspeed (Change later)
+                bullet.speed = math.sqrt((bullet.hspeed ** 2) + (bullet.vspeed ** 2))
+                bullet.direction = point_direction(bullet.x, bullet.y, bullet.x + bullet.hspeed, bullet.y + bullet.vspeed)
                 
+                bullet.speed += np.random.random()*4 - 2
+                bullet.direction += np.random.random()*15 - 7.5
+                # Sets hspeed and vspeed based on speed and direction (Change later)
+                bullet.hspeed = bullet.speed * math.cos(bullet.direction)
+                bullet.vspeed = bullet.speed * math.sin(bullet.direction)
+                
+                # Move shot forward to avoid immediate collision with a wall behind the character
+                bullet.x += 15 * math.cos(bullet.direction)
+                bullet.y += 15 * math.sin(bullet.direction)
+                self.owner.current_weapon.ready_to_shoot_alarm = 35 * ((min(1, abs(math.cos(degtorad(self.owner.aim_direction))) * 13 / abs(math.cos(degtorad(self.owner.aim_direction)) * 13 + self.owner.hspeed)) - 1) / 2 + 1) / delta_factor
 
 
             self.ready_to_shoot = False
@@ -1106,15 +1118,36 @@ class Shot:
     def __init__(self, x, y, direction, speed):
         self.x = x
         self.y = y
-        self.hspeed = 0
-        self.vspeed = 0
-        self.projectile = 7 #DAMAGE_SOURCE_SCATTERGUN
-        self.dir = direction
+        self.direction = direction
         self.speed = speed
+        self.hspeed = self.speed * math.cos(self.direction)
+        self.vspeed = self.speed * math.sin(self.direction)
+        self.projectile = 7 #DAMAGE_SOURCE_SCATTERGUN
+        self.first_step = True
 
         self.owner = None
         self.owner_player = None
         self.team = None
+    def normal_step(self):
+        self.vspeed += 0.15 * delta_factor
+
+        colliding = False
+        if self.first_step:
+            colliding += not place_free(self, self.x, self.y)
+
+        self.x += self.hspeed * delta_factor
+        self.y += self.vspeed * delta_factor
+
+        colliding += not place_free(self, self.x, self.y)
+        if colliding:
+            # Destroy the bullet here
+            pass
+
+        # I think GG2 forgot to apply the delta factor here
+        self.x -= self.hspeed
+        self.y -= self.vspeed
+
+        self.first_step = False
 
 class GG2Map:
     def __init__(self, gg2_map_data):
@@ -1460,6 +1493,7 @@ class GameServer:
             commands_done += 1
 
     def process_client_alarms(self):
+        # FIX ALARMS (If the alarm is at 0 which it will be a lot then it will CONSTANTLY RUN)
         for player_to_service in player_list:
             if player_to_service._id != 1000:
                 # Respawn Alarm
@@ -1515,7 +1549,6 @@ class GameServer:
                     self.server_to_send.write(self.serialize_state(QUICK_UPDATE))
                 else:
                     self.server_to_send.write(self.serialize_state(INPUTSTATE))
-                #print(time.time() - test_time)
                     
                 # Begin step collisions
                 for player_to_service in player_list:
