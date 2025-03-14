@@ -1,6 +1,6 @@
 import subprocess
 import struct
-import hjson
+import json
 import zlib
 import time
 from PIL import Image
@@ -79,9 +79,31 @@ def get_image_entities(map_image_data):
     if map_image_data[entities_start + 11] == "[":
         print("New Entity Format")
         image_entities = map_image_data[entities_start + 11:entities_end]
-        image_entities = image_entities.replace(",", "\n")
-        image_entities = image_entities.replace("}", "\n}")
-        image_entities = hjson.loads(image_entities)
+        # Formats the entities so they can be loaded with the json module
+        image_entities = image_entities.replace("{", '{"')
+        image_entities = image_entities.replace(":", '":')
+        image_entities = image_entities.replace(",", ',"')
+        image_entities = image_entities.replace('"{', '{')
+        image_entities = image_entities.replace("}", "}\n")
+        
+        pos = 0;
+        while image_entities.find(":", pos) != -1:
+            pos = image_entities.find(":", pos) + 1
+            found_char = image_entities[pos]
+
+            # If the first char isn't a number 1-9 or a negative sign then its assumed to be a string
+            # If its determined to be a string then the value is wrapped in double quotes
+            if (found_char.isnumeric() == False or found_char == "0") and found_char != "-":
+                image_entities = image_entities[:pos] + '"' + image_entities[pos:]
+                
+                comma_pos = image_entities.find(",", pos)
+                bracket_pos = image_entities.find("}", pos)
+                if comma_pos != -1 and comma_pos < bracket_pos:
+                    image_entities = image_entities[:comma_pos] + '"' + image_entities[comma_pos:]
+                else:
+                    image_entities = image_entities[:bracket_pos] + '"' + image_entities[bracket_pos:]
+
+        image_entities = json.loads(image_entities)
 
         for entity in image_entities:
             print(entity)

@@ -3,7 +3,6 @@ This is an ongoing attempt to re-write Gang Garrison 2's server in python for ea
 ## Dependencies
 To run the server you'll need Python 3 with the following packages installed via pip
 ```
-- hjson
 - numpy
 - pillow
 - upnpy
