@@ -11,6 +11,7 @@ import configparser
 import urllib.request
 from constants import *
 import map_data_extractor
+from gm8_like_functions import *
 
 
 # --------------------------------------------------------------------------
@@ -169,23 +170,6 @@ def point_direction(x1, y1, x2, y2):
 def degtorad(degrees):
     return degrees * math.pi / 180
 
-def place_free(obj, xPos, yPos):
-    collisions = []
-    rect2_x = xPos + obj.collision_mask.x1
-    rect2_y = yPos + obj.collision_mask.y1
-    rect2_width = obj.collision_mask.width
-    rect2_height = obj.collision_mask.height
-
-    for rect1 in loaded_map.wm_collision_rects:
-        if (rect1.x <= rect2_x + rect2_width and
-                rect1.x + rect1.width >= rect2_x and
-                rect1.y <= rect2_y + rect2_height and
-                rect1.y + rect1.height >= rect2_y):
-            collisions.append(rect1)
-    if collisions:
-        return False
-    else:
-        return True
 
 
 # --------------------------------------------------------------------------
@@ -626,7 +610,7 @@ class Character:
 
             new_x = self.x + move_x*i/MAX_I
             new_y = self.y + move_y*i/MAX_I
-            if place_free(self, new_x, new_y):
+            if place_free(self, new_x, new_y, loaded_map.wm_collision_rects):
                 total_moved += math.dist([self.x, self.y], [new_x, new_y])
                 self.x = new_x
                 self.y = new_y
@@ -649,7 +633,7 @@ class Character:
         bbox_height = self.collision_mask.height
         bbox_width = self.collision_mask.width
 
-        if not place_free(self, self.x, self.y):
+        if not place_free(self, self.x, self.y, loaded_map.wm_collision_rects):
             self.move_outside_solid(90, bbox_height/2)
             distu = old_y - self.y
             uy = self.y
@@ -679,7 +663,7 @@ class Character:
             else:
                 self.x = lx
             
-            if not place_free(self, self.x, self.y):
+            if not place_free(self, self.x, self.y, loaded_map.wm_collision_rects):
                 self.x = old_x
                 self.y = old_y
 
@@ -701,19 +685,19 @@ class Character:
             hleft -= self.x - prev_x
             vleft -= self.y - prev_y
 
-            if vleft != 0 and not place_free(self, self.x, self.y + sign(vleft)):
+            if vleft != 0 and not place_free(self, self.x, self.y + sign(vleft), loaded_map.wm_collision_rects):
                 if vleft > 0:
                     self.move_status = 0
                 vleft = 0
                 self.vspeed = 0
                 collision_rectified = True
 
-            if hleft != 0 and not place_free(self, self.x + sign(hleft), self.y):
-                if place_free(self, self.x + sign(hleft), self.y - 6):
+            if hleft != 0 and not place_free(self, self.x + sign(hleft), self.y, loaded_map.wm_collision_rects):
+                if place_free(self, self.x + sign(hleft), self.y - 6, loaded_map.wm_collision_rects):
                     self.y -= 6
                     collision_rectified = True
                     self.move_status = 0
-                elif place_free(self, self.x + sign(hleft), self.y + 6) and abs(self.hspeed) >= abs(self.vspeed):
+                elif place_free(self, self.x + sign(hleft), self.y + 6, loaded_map.wm_collision_rects) and abs(self.hspeed) >= abs(self.vspeed):
                     self.y += 6
                     collision_rectified = True
                     self.move_status = 0
@@ -731,8 +715,8 @@ class Character:
 
 
     def begin_step(self):
-        stuck_in_wall = not place_free(self, self.x, self.y)
-        obstacle_below = not place_free(self, self.x, self.y+1)
+        stuck_in_wall = not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
+        obstacle_below = not place_free(self, self.x, self.y+1, loaded_map.wm_collision_rects)
         on_ground = False
         on_non_surfing_ground = False
 
@@ -850,7 +834,7 @@ class Character:
         else:
             _test = self._last_xscale < self.image_xscale
 
-        if _test and not place_free(self, self.x + sign(self.hspeed), self.y):
+        if _test and not place_free(self, self.x + sign(self.hspeed), self.y, loaded_map.wm_collision_rects):
             self.spin_jumping = True
         else:
             self.spin_jumping = False
@@ -863,7 +847,7 @@ class Character:
         else:
             _gravity = 0.6
 
-        if self.spin_jumping and place_free(self, self.x, self.y - _gravity) and (place_free(self, self.x, self.y +1) or self.vspeed < 0):
+        if self.spin_jumping and place_free(self, self.x, self.y - _gravity, loaded_map.wm_collision_rects) and (place_free(self, self.x, self.y +1, loaded_map.wm_collision_rects) or self.vspeed < 0):
             self.applied_gravity -= _gravity
         else:
             self.spin_jumping = False
@@ -878,7 +862,7 @@ class Character:
         y_previous = self.y
         x_previous = self.x
 
-        doHit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor)
+        doHit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor, loaded_map.wm_collision_rects)
         if doHit:
             # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
@@ -888,7 +872,7 @@ class Character:
             self.y += self.vspeed * delta_factor
 
         # Fallback?
-        if place_free(self, self.x, self.y + 1):
+        if place_free(self, self.x, self.y + 1, loaded_map.wm_collision_rects):
             self.vspeed += self.applied_gravity*delta_factor/2
         if self.vspeed > 10:
             self.vspeed = 10
@@ -905,12 +889,12 @@ class Character:
 
     def end_step(self):
         if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or False:
-            if place_free(self, self.x, self.y + 6):
-                if not place_free(self, self.x, self.y + 7):
+            if place_free(self, self.x, self.y + 6, loaded_map.wm_collision_rects):
+                if not place_free(self, self.x, self.y + 7, loaded_map.wm_collision_rects):
                     self.y += 6
                 elif math.sqrt((self.hspeed ** 2) + (self.vspeed ** 2)) > 6:
-                    if place_free(self, self.x, self.y + 12):
-                        if not place_free(self, self.x, self.y +13):
+                    if place_free(self, self.x, self.y + 12, loaded_map.wm_collision_rects):
+                        if not place_free(self, self.x, self.y +13, loaded_map.wm_collision_rects):
                             self.y += 12
 
 
@@ -1133,12 +1117,12 @@ class Shot:
 
         colliding = False
         if self.first_step:
-            colliding += not place_free(self, self.x, self.y)
+            colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
 
         self.x += self.hspeed * delta_factor
         self.y += self.vspeed * delta_factor
 
-        colliding += not place_free(self, self.x, self.y)
+        colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
         if colliding:
             # Destroy the bullet here
             pass
@@ -1770,6 +1754,7 @@ def main():
     # Gets map entities and wallmask
     global loaded_map
     loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_name + ".png"))
+    
 
     # Start Game Server
     global game_server
