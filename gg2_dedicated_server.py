@@ -170,6 +170,9 @@ def point_direction(x1, y1, x2, y2):
 def degtorad(degrees):
     return degrees * math.pi / 180
 
+# GM8's internal rounding
+def gm8_round(input_num):
+    return math.floor(input_num * 1000000000 + 0.5) / 1000000000
 
 
 # --------------------------------------------------------------------------
@@ -555,7 +558,7 @@ class Character:
         self.control_factor = self.base_control
         self.friction_factor = self.base_friction
         self.run_power = self.base_run_power
-        self.base_max_speed = abs(self.base_run_power * self.base_control / (self.base_friction-1))
+        self.base_max_speed = gm8_round(abs(self.base_run_power * self.base_control / (self.base_friction-1)))
         self.highest_base_max_speed = 9.735  # Approximation error < 0.0017 of scout's base max speed
 
         # Create weapon
@@ -582,13 +585,13 @@ class Character:
 
     def move_outside_solid(self, direction, max_dist):
         if direction == 0:
-            self.x += max_dist
+            self.x = gm8_round(self.x + max_dist)
         elif direction == 90:
-            self.y -= max_dist
+            self.y = gm8_round(self.y - max_dist)
         elif direction == 180:
-            self.x -= max_dist
+            self.x = gm8_round(self.x - max_dist)
         elif direction == 270:
-            self.y += max_dist
+            self.y = gm8_round(self.y + max_dist)
 
     def good_move_contact_solid(self, arg0, arg1):
         # Function from GG2
@@ -598,20 +601,20 @@ class Character:
         MAX_I = 8
         i = 8
         max_distance = arg1
-        hvec = math.cos(degtorad(arg0)) * max_distance
-        vvec = -math.sin(degtorad(arg0)) * max_distance
+        hvec = gm8_round(gm8_round(math.cos(gm8_round(degtorad(arg0)))) * max_distance)
+        vvec = gm8_round(gm8_round(-math.sin(gm8_round(degtorad(arg0)))) * max_distance)
         sfac = max(abs(hvec), abs(vvec))
         total_moved = 0
         last_collision_happened = False
 
         while total_moved < max_distance and i > 0:
-            move_x = hvec/sfac * i/MAX_I * min(1, max_distance - total_moved)
-            move_y = vvec/sfac * i/MAX_I * min(1, max_distance - total_moved)
+            move_x = gm8_round(gm8_round(gm8_round(hvec/sfac) * i/MAX_I) * min(1, max_distance - total_moved))
+            move_y = gm8_round(gm8_round(gm8_round(vvec/sfac) * i/MAX_I) * min(1, max_distance - total_moved))
 
-            new_x = self.x + move_x*i/MAX_I
-            new_y = self.y + move_y*i/MAX_I
+            new_x = gm8_round(self.x + gm8_round(move_x*i/MAX_I))
+            new_y = gm8_round(self.y + gm8_round(move_y*i/MAX_I))
             if place_free(self, new_x, new_y, loaded_map.wm_collision_rects):
-                total_moved += math.dist([self.x, self.y], [new_x, new_y])
+                total_moved = gm8_round(total_moved + math.dist([self.x, self.y], [new_x, new_y]))
                 self.x = new_x
                 self.y = new_y
                 if i < MAX_I:
@@ -623,8 +626,8 @@ class Character:
         return total_moved
 
     def character_hit_obstacle(self):
-        self.hspeed *= delta_factor
-        self.vspeed *= delta_factor
+        self.hspeed = gm8_round(self.hspeed * delta_factor)
+        self.vspeed = gm8_round(self.vspeed * delta_factor)
         
         old_x = self.x
         old_y = self.y
@@ -680,10 +683,10 @@ class Character:
             prev_x = self.x
             prev_y = self.y
             
-            self.good_move_contact_solid(point_direction(self.x, self.y, self.x + hleft, self.y + vleft), math.dist([self.x, self.y], [self.x + hleft, self.y + vleft]))
+            self.good_move_contact_solid(point_direction(self.x, self.y, self.x + hleft, self.y + vleft), gm8_round(math.dist([self.x, self.y], [self.x + hleft, self.y + vleft])))
 
-            hleft -= self.x - prev_x
-            vleft -= self.y - prev_y
+            hleft = gm8_round(hleft - (self.x - prev_x))
+            vleft = gm8_round(vleft - (self.y - prev_y))
 
             if vleft != 0 and not place_free(self, self.x, self.y + sign(vleft), loaded_map.wm_collision_rects):
                 if vleft > 0:
@@ -694,11 +697,11 @@ class Character:
 
             if hleft != 0 and not place_free(self, self.x + sign(hleft), self.y, loaded_map.wm_collision_rects):
                 if place_free(self, self.x + sign(hleft), self.y - 6, loaded_map.wm_collision_rects):
-                    self.y -= 6
+                    self.y = gm8_round(self.y - 6)
                     collision_rectified = True
                     self.move_status = 0
                 elif place_free(self, self.x + sign(hleft), self.y + 6, loaded_map.wm_collision_rects) and abs(self.hspeed) >= abs(self.vspeed):
-                    self.y += 6
+                    self.y = gm8_round(self.y + 6)
                     collision_rectified = True
                     self.move_status = 0
                 else:
@@ -710,9 +713,8 @@ class Character:
                 self.vspeed = 0
                 vleft = 0
 
-        self.hspeed /= delta_factor
-        self.vspeed /= delta_factor
-
+        self.hspeed = gm8_round(self.hspeed / delta_factor)
+        self.vspeed = gm8_round(self.vspeed / delta_factor)
 
     def begin_step(self):
         stuck_in_wall = not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
@@ -792,16 +794,16 @@ class Character:
         for x in range(frameskip):
             if not self.taunting and not self.omnomnomnom:
                 if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x40) and self.hspeed >= -self.base_max_speed:
-                    self.hspeed -= self.run_power * self.control_factor * skip_delta_factor
+                    self.hspeed = gm8_round(self.hspeed - (self.run_power * self.control_factor * skip_delta_factor))
                     controlling = True;
                 if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x20) and self.hspeed <= self.base_max_speed:
-                    self.hspeed += self.run_power * self.control_factor * skip_delta_factor
+                    self.hspeed = gm8_round(self.hspeed + (self.run_power * self.control_factor * skip_delta_factor))
                     controlling = not controlling;
 
             if abs(self.hspeed) > self.base_max_speed * 2 or (num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x60) and abs(self.hspeed) < self.base_max_speed):
-                self.hspeed /= (self.base_friction * skip_delta_factor + (1-1*skip_delta_factor))
+                self.hspeed = gm8_round(self.hspeed / (self.base_friction * skip_delta_factor + (1-1*skip_delta_factor)))
             else:
-                self.hspeed /= (self.friction_factor * skip_delta_factor + (1-1*skip_delta_factor))
+                self.hspeed = gm8_round(self.hspeed / (self.friction_factor * skip_delta_factor + (1-1*skip_delta_factor)))
 
         # Reseting key variables
         self.pressed_keys = 0
@@ -813,10 +815,9 @@ class Character:
 
         if not on_ground and not stuck_in_wall:
             if False:
-                self.applied_gravity += 0.54
+                self.applied_gravity = gm8_round(self.applied_gravity + 0.54)
             else:
-                self.applied_gravity += 0.6
-
+                self.applied_gravity = gm8_round(self.applied_gravity + 0.6)
 
     def normal_step(self):
         self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
@@ -848,12 +849,12 @@ class Character:
             _gravity = 0.6
 
         if self.spin_jumping and place_free(self, self.x, self.y - _gravity, loaded_map.wm_collision_rects) and (place_free(self, self.x, self.y +1, loaded_map.wm_collision_rects) or self.vspeed < 0):
-            self.applied_gravity -= _gravity
+            self.applied_gravity = gm8_round(self.applied_gravity - _gravity)
         else:
             self.spin_jumping = False
 
         # Gravity
-        self.vspeed += self.applied_gravity*delta_factor/2
+        self.vspeed = gm8_round(self.vspeed + (self.applied_gravity*delta_factor/2))
         if self.vspeed > 10:
             self.vspeed = 10
             
@@ -866,36 +867,35 @@ class Character:
         if doHit:
             # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
-            #print(self.y)
         else:
-            self.x += self.hspeed * delta_factor
-            self.y += self.vspeed * delta_factor
+            self.x = gm8_round(self.x + (self.hspeed * delta_factor))
+            self.y = gm8_round(self.y + (self.vspeed * delta_factor))
 
         # Fallback?
         if place_free(self, self.x, self.y + 1, loaded_map.wm_collision_rects):
-            self.vspeed += self.applied_gravity*delta_factor/2
+            self.vspeed = gm8_round(self.vspeed + (self.applied_gravity*delta_factor/2))
         if self.vspeed > 10:
             self.vspeed = 10
         self.applied_gravity = 0
 
         # Dropdown platforms? Never heard of them
 
-        self.x -= self.hspeed
-        self.y -= self.vspeed
+        self.x = gm8_round(self.x - self.hspeed)
+        self.y = gm8_round(self.y - self.vspeed)
 
         # GM8 updates x & y with horizontal and vertical speeds on its own so this is needed
-        self.x += self.hspeed
-        self.y += self.vspeed
+        self.x = gm8_round(self.x + self.hspeed)
+        self.y = gm8_round(self.y + self.vspeed)
 
     def end_step(self):
         if self.vspeed == 0 and num_to_bool(hex_as_int(self.key_state) & 0x02) or True or False:
             if place_free(self, self.x, self.y + 6, loaded_map.wm_collision_rects):
                 if not place_free(self, self.x, self.y + 7, loaded_map.wm_collision_rects):
-                    self.y += 6
+                    self.y = gm8_round(self.y + 6)
                 elif math.sqrt((self.hspeed ** 2) + (self.vspeed ** 2)) > 6:
                     if place_free(self, self.x, self.y + 12, loaded_map.wm_collision_rects):
                         if not place_free(self, self.x, self.y +13, loaded_map.wm_collision_rects):
-                            self.y += 12
+                            self.y = gm8_round(self.y + 12)
 
 
 class Scout(Character):
