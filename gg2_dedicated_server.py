@@ -180,8 +180,8 @@ def gm8_round(input_num):
 # --------------------------------------------------------------------------
 class objectMask:
     def __init__(self, xPos1, yPos1, width, height):
-        self.x1 = xPos1
-        self.y1 = yPos1
+        self.x = xPos1
+        self.y = yPos1
         self.width = width
         self.height = height
 
@@ -565,23 +565,32 @@ class Character:
         if self.player_object._class == CLASS_SCOUT:
             self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_SOLDIER:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_SNIPER:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_DEMOMAN:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_MEDIC:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_ENGINEER:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_HEAVY:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_SPY:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_PYRO:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
         elif self.player_object._class == CLASS_QUOTE:
-            pass
+            # Temporary so choosing other classes doesn't crash
+            self.current_weapon = Scattergun(self)
 
     def move_outside_solid(self, direction, max_dist):
         if direction == 0:
@@ -897,6 +906,18 @@ class Character:
                         if not place_free(self, self.x, self.y +13, loaded_map.wm_collision_rects):
                             self.y = gm8_round(self.y + 12)
 
+        if self.hp <= 0:
+            game_server.server_to_send.write(struct.pack("<BBBBB",
+            10,
+            player_list.index(self.player_object),
+            player_list.index(self.player_object),
+            255,
+            25))
+            self.player_object.respawn_timer = 5
+            self.player_object.character_object = None
+            print("Killed Player")
+            
+
 
 class Scout(Character):
     def __init__(self, player_object):
@@ -1060,7 +1081,9 @@ class Scattergun(Weapon):
     def fire_weapon(self):
         to_send = BytesIO()
         if self.ready_to_shoot and self.ammo_count > 0:
-            seed = np.random.randint(0, 65536)
+            np.seterr(over='ignore')
+            lcg_rand = LcgRandom()
+            seed = lcg_rand.irandom(65535)
 
             game_server.server_to_send.write(struct.pack("<BBHHbbH",
                 WEAPON_FIRE,
@@ -1071,21 +1094,21 @@ class Scattergun(Weapon):
                 round(self.owner.vspeed*8.5),
                 seed))
 
-            rng = np.random.RandomState(seed)
+            lcg_rand.set_seed(seed)
             self.ammo_count = max(0, self.ammo_count - 1)
 
             for i in range(6):
-                bullet = Shot(self.owner.x, self.owner.y, self.owner.aim_direction, 13)
+                bullet = Shot(self.owner, self.owner.x, self.owner.y, self.owner.aim_direction, 13)
                 bullet.hspeed += self.owner.hspeed
                 # Sets speed and direction based on hspeed and vspeed (Change later)
                 bullet.speed = math.sqrt((bullet.hspeed ** 2) + (bullet.vspeed ** 2))
                 bullet.direction = point_direction(bullet.x, bullet.y, bullet.x + bullet.hspeed, bullet.y + bullet.vspeed)
                 
-                bullet.speed += np.random.random()*4 - 2
-                bullet.direction += np.random.random()*15 - 7.5
+                bullet.speed += lcg_rand.random(4) - 2
+                bullet.direction += lcg_rand.random(15) - 7.5
                 # Sets hspeed and vspeed based on speed and direction (Change later)
-                bullet.hspeed = bullet.speed * math.cos(bullet.direction)
-                bullet.vspeed = bullet.speed * math.sin(bullet.direction)
+                bullet.hspeed = bullet.speed * math.cos(math.radians(bullet.direction))
+                bullet.vspeed = math.sqrt(math.pow(bullet.speed, 2) - math.pow(bullet.hspeed, 2))
                 
                 # Move shot forward to avoid immediate collision with a wall behind the character
                 bullet.x += 15 * math.cos(bullet.direction)
@@ -1099,19 +1122,23 @@ class Scattergun(Weapon):
             #print("Weapon Fired")
 
 class Shot:
-    def __init__(self, x, y, direction, speed):
+    def __init__(self, owner, x, y, direction, speed):
+        self.collision_mask = objectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
         self.x = x
         self.y = y
         self.direction = direction
         self.speed = speed
-        self.hspeed = self.speed * math.cos(self.direction)
-        self.vspeed = self.speed * math.sin(self.direction)
+        self.hspeed = self.speed * math.cos(math.radians(self.direction))
+        self.vspeed = math.sqrt(math.pow(self.speed, 2) - math.pow(self.hspeed, 2))
+        
         self.projectile = 7 #DAMAGE_SOURCE_SCATTERGUN
         self.first_step = True
 
-        self.owner = None
-        self.owner_player = None
-        self.team = None
+        self.owner = owner
+        self.owner_player = owner.player_object
+        self.team = self.owner_player.team
+        bullet_list.append(self)
+        
     def normal_step(self):
         self.vspeed += 0.15 * delta_factor
 
@@ -1125,13 +1152,30 @@ class Shot:
         colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
         if colliding:
             # Destroy the bullet here
-            pass
+            bullet_list.remove(self)
 
-        # I think GG2 forgot to apply the delta factor here
         self.x -= self.hspeed
         self.y -= self.vspeed
 
         self.first_step = False
+        
+        # GM8 updates x & y with horizontal and vertical speeds on its own so this is needed
+        self.x += self.hspeed
+        self.y += self.vspeed
+        
+    def collision_step(self):
+        for player in player_list:
+            if player._id != 1000 and player != self.owner_player and player != self.team:
+                if player.character_object is not None:
+                    # Change out this bad temp solution later
+                    existing_mask = player.character_object.collision_mask
+                    temp_mask = objectMask(player.character_object.x + existing_mask.x, player.character_object.y + existing_mask.y, existing_mask.width, existing_mask.height)
+                    if not place_free(self, self.x, self.y, [temp_mask]):
+                        player.character_object.hp -= 8
+                        player.character_object.hspeed = gm8_round(player.character_object.hspeed + (self.hspeed * 0.03))
+                        player.character_object.vspeed = gm8_round(player.character_object.vspeed + (self.vspeed * 0.03))
+                        bullet_list.remove(self)
+
 
 class GG2Map:
     def __init__(self, gg2_map_data):
@@ -1261,7 +1305,7 @@ class GameServer:
                             int(round(joining_player.character_object.y*5)),
                             int(round(joining_player.character_object.hspeed*8.5)),
                             int(round(joining_player.character_object.vspeed*8.5)),
-                            math.ceil(joining_player.character_object.hp),
+                            max(math.ceil(joining_player.character_object.hp), 0),
                             joining_player.character_object.current_weapon.ammo_count,
                             ((joining_player.character_object.move_status & 0x7) << 1)))
                         
@@ -1549,10 +1593,16 @@ class GameServer:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.normal_step()
 
+                for bullet in bullet_list:
+                    bullet.normal_step()
+
                 for player_to_service in player_list:
                     if player_to_service._id != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
+
+                for bullet in bullet_list:
+                    bullet.collision_step()
 
             # Make sure server updates 30 or 60 times a second
             time.sleep(max(0, (1/room_speed) - (time.time() - start_time) - 0.008)) #0.001 has overruns while 0.01 has high cpu usage
@@ -1601,6 +1651,9 @@ class GameServer:
 player_list = [Player(None, 1000, host_name, TEAM_SPECTATOR, CLASS_SCOUT)]
 joining_players = []
 players_to_remove = []
+
+# Creates list for bullets
+bullet_list = []
 
 
 # Stuff below is setting up packet for registration
