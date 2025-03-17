@@ -435,7 +435,6 @@ class Player:
     def leave_server(self):
         game_server.server_to_send.write(struct.pack(">BB", PLAYER_LEAVE, player_list.index(self)))
         player_list.remove(self)
-        players_to_remove.remove(self)
         print("Player Socket Disconnect")
 
 
@@ -1403,7 +1402,8 @@ class GameServer:
             try:
                 data = conn.recv(1)
             except ConnectionError:
-                players_to_remove.append(player_to_service)
+                if player_to_service not in players_to_remove:
+                    players_to_remove.append(player_to_service)
                 #print("Connection Error")
                 commands_done = 10
                 break
@@ -1426,7 +1426,8 @@ class GameServer:
             # Reactions to client data
             if data[0] == PLAYER_LEAVE:
                 print("Player Left???")
-                players_to_remove.append(player_to_service)
+                if player_to_service not in players_to_remove:
+                    players_to_remove.append(player_to_service)
 
             elif data[0] == PLAYER_CHANGETEAM:
                 print("Received Change Team")
@@ -1563,6 +1564,7 @@ class GameServer:
                 for player in players_to_remove:
                     if player in player_list:
                         player.leave_server()
+                    players_to_remove.remove(player)
                 server_registration()
 
             if len(player_list) > 1:
@@ -1623,7 +1625,8 @@ class GameServer:
                             conn = player_to_service.connection
                             conn.sendall(self.server_to_send.getvalue())
                         except ConnectionError:
-                            players_to_remove.append(player_to_service)
+                            if player_to_service not in players_to_remove:
+                                players_to_remove.append(player_to_service)
                             print("Connection Error")
                         except BlockingIOError:
                             print("Blocking IO Error")
