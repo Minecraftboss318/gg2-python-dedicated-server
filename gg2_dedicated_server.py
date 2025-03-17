@@ -201,7 +201,7 @@ class JoiningPlayer:
         self.conn.settimeout(0)
         try:
             data = self.conn.recv(1)
-        except ConnectionResetError:
+        except ConnectionError:
             print("New Connection Socket Disconnect")
             return 1
         except BlockingIOError:
@@ -1402,12 +1402,12 @@ class GameServer:
             data = None
             try:
                 data = conn.recv(1)
-            except BlockingIOError:
+            except ConnectionError:
+                players_to_remove.append(player_to_service)
+                #print("Connection Error")
                 commands_done = 10
                 break
-            except ConnectionResetError:
-                players_to_remove.append(player_to_service)
-                print("Connection Reset Error")
+            except BlockingIOError:
                 commands_done = 10
                 break
             except TimeoutError:
@@ -1622,14 +1622,11 @@ class GameServer:
                         try:
                             conn = player_to_service.connection
                             conn.sendall(self.server_to_send.getvalue())
-                        except ConnectionResetError:
+                        except ConnectionError:
                             players_to_remove.append(player_to_service)
-                            print("Connection Reset Error")
+                            print("Connection Error")
                         except BlockingIOError:
                             print("Blocking IO Error")
-                        except BrokenPipeError:
-                            players_to_remove.append(player_to_service)
-                            print("Broken Pipe Error")
                         except TimeoutError:
                             print("Server Send Timeout???")
                         
