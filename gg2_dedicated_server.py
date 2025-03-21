@@ -1131,11 +1131,11 @@ class Scattergun(Weapon):
                 bullet.direction += lcg_rand.random(15) - 7.5
                 # Sets hspeed and vspeed based on speed and direction (Change later)
                 bullet.hspeed = bullet.speed * math.cos(math.radians(bullet.direction))
-                bullet.vspeed = math.sqrt(math.pow(bullet.speed, 2) - math.pow(bullet.hspeed, 2))
+                bullet.vspeed = bullet.speed * -math.sin(math.radians(bullet.direction))
                 
                 # Move shot forward to avoid immediate collision with a wall behind the character
-                bullet.x += 15 * math.cos(bullet.direction)
-                bullet.y += 15 * math.sin(bullet.direction)
+                bullet.x += 15 * math.cos(math.radians(bullet.direction))
+                bullet.y += 15 * -math.sin(math.radians(bullet.direction))
                 self.owner.current_weapon.ready_to_shoot_alarm = 35 * ((min(1, abs(math.cos(degtorad(self.owner.aim_direction))) * 13 / abs(math.cos(degtorad(self.owner.aim_direction)) * 13 + self.owner.hspeed)) - 1) / 2 + 1) / delta_factor
 
 
@@ -1153,7 +1153,7 @@ class Shot:
         self.direction = direction
         self.speed = speed
         self.hspeed = self.speed * math.cos(math.radians(self.direction))
-        self.vspeed = math.sqrt(math.pow(self.speed, 2) - math.pow(self.hspeed, 2))
+        self.vspeed = self.speed * -math.sin(math.radians(self.direction))
         
         self.projectile = 7 #DAMAGE_SOURCE_SCATTERGUN
         self.first_step = True
@@ -1633,12 +1633,12 @@ class GameServer:
 
             # Make sure server updates 30 or 60 times a second
             time.sleep(max(0, (1/room_speed) - (time.time() - start_time) - 0.008)) #0.001 has overruns while 0.01 has high cpu usage
-            if (1/room_speed) - (time.time() - start_time) < 0:
-                print("Server Sleep Overrun")
-            while 0.001 < (1/room_speed) - (time.time() - start_time):
+            #if (1/room_speed) - (time.time() - start_time) < 0:
+            #    print("Server Sleep Overrun")
+            while 0 <= (1/room_speed) - (time.time() - start_time): #was 0.001. 0 <= performs a lot smoother
                 pass
-            if (1/room_speed) - (time.time() - start_time) < 0:
-                print("Server Update Time Overrun")
+            #if (1/room_speed) - (time.time() - start_time) < 0:
+            #    print("Server Update Time Overrun")
                 
             start_time = time.time()
 
