@@ -184,6 +184,29 @@ class objectMask:
         self.y = yPos1
         self.width = width
         self.height = height
+        
+    def rotated_mask(self, direction):
+        rot = math.radians(360 - direction)
+        point1 = (self.x, self.y)
+        point2 = (self.x + self.width, self.y)
+        point3 = (self.x + self.width, self.y + self.height)
+        point4 = (self.x, self.y + self.height)
+
+        #point1 = (math.cos(rot)*(point1[0]-0.5)-math.sin(rot)*(point1[1]-0.5)+0.5, math.sin(rot)*(point1[0]-0.5)+math.cos(rot)*(point1[1]-0.5)+0.5)
+        #point2 = (math.cos(rot)*(point2[0]-0.5)-math.sin(rot)*(point2[1]-0.5)+0.5, math.sin(rot)*(point2[0]-0.5)+math.cos(rot)*(point2[1]-0.5)+0.5)
+        #point3 = (math.cos(rot)*(point3[0]-0.5)-math.sin(rot)*(point3[1]-0.5)+0.5, math.sin(rot)*(point3[0]-0.5)+math.cos(rot)*(point3[1]-0.5)+0.5)
+        #point4 = (math.cos(rot)*(point4[0]-0.5)-math.sin(rot)*(point4[1]-0.5)+0.5, math.sin(rot)*(point4[0]-0.5)+math.cos(rot)*(point4[1]-0.5)+0.5)
+        point1 = (math.cos(rot)*(point1[0]-0)-math.sin(rot)*(point1[1]-0)+0, math.sin(rot)*(point1[0]-0)+math.cos(rot)*(point1[1]-0)+0)
+        point2 = (math.cos(rot)*(point2[0]-0)-math.sin(rot)*(point2[1]-0)+0, math.sin(rot)*(point2[0]-0)+math.cos(rot)*(point2[1]-0)+0)
+        point3 = (math.cos(rot)*(point3[0]-0)-math.sin(rot)*(point3[1]-0)+0, math.sin(rot)*(point3[0]-0)+math.cos(rot)*(point3[1]-0)+0)
+        point4 = (math.cos(rot)*(point4[0]-0)-math.sin(rot)*(point4[1]-0)+0, math.sin(rot)*(point4[0]-0)+math.cos(rot)*(point4[1]-0)+0)
+
+        x = min(point1[0], point2[0], point3[0], point4[0])
+        y = min(point1[1], point2[1], point3[1], point4[1])
+        width = max(point1[0], point2[0], point3[0], point4[0]) - x
+        height = max(point1[1], point2[1], point3[1], point4[1]) - y
+
+        return x, y, width, height
 
 
 class JoiningPlayer:
@@ -445,6 +468,7 @@ class Character:
         self.y = 0
         self.hspeed = 0
         self.vspeed = 0
+        self.rotatable = False
 
         # Default character values
         self.can_double_jump = 0
@@ -1123,6 +1147,7 @@ class Scattergun(Weapon):
 class Shot:
     def __init__(self, owner, x, y, direction, speed):
         self.collision_mask = objectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
+        self.rotatable = True
         self.x = x
         self.y = y
         self.direction = direction

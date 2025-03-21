@@ -27,15 +27,17 @@ def degtorad(degrees):
 # colliding with the provided rectangles
 def place_free(obj, xPos, yPos, collision_rects):
     collisions = []
-    rect2_x = xPos + obj.collision_mask.x1
-    rect2_y = yPos + obj.collision_mask.y1
-    rect2_width = obj.collision_mask.width
-    rect2_height = obj.collision_mask.height
+    direction = 0
+    if obj.rotatable:
+        direction = point_direction(obj.x, obj.y, obj.x + obj.hspeed, obj.y + obj.vspeed)
+    rect2_x, rect2_y, rect2_w, rect2_h = obj.collision_mask.rotated_mask(direction)
+    rect2_x += xPos
+    rect2_y += yPos
 
     for rect1 in collision_rects:
-        if (rect1.x <= rect2_x + rect2_width and
+        if (rect1.x <= rect2_x + rect2_w and
                 rect1.x + rect1.width >= rect2_x and
-                rect1.y <= rect2_y + rect2_height and
+                rect1.y <= rect2_y + rect2_h and
                 rect1.y + rect1.height >= rect2_y):
             collisions.append(rect1)
     if collisions:
@@ -57,12 +59,15 @@ class LcgRandom:
         self.seed = np.random.randint(-2147483648, 2147483647)
 
     def set_seed(self, num):
+        np.seterr(over='ignore')
         self.seed = np.int32(num)
 
     def cycle(self):
+        np.seterr(over='ignore')
         self.seed = np.int32(np.int32(self.seed) * self.MULTIPLIER + self.INCREMENT)
 
     def random(self, upper_range):
+        np.seterr(over='ignore')
         self.cycle()
         int_step_float = ctypes.c_double.from_address(ctypes.addressof(self.INT_STEP)).value
         random_float = np.float64(np.float64(np.uint32(self.seed)) * np.float64(int_step_float) * upper_range)
@@ -70,6 +75,7 @@ class LcgRandom:
         return math.floor(random_float * 100 + 0.5) / 100
 
     def irandom(self, upper_range):
+        np.seterr(over='ignore')
         self.cycle()
         ls = np.uint64(self.seed) & 0xFFFF_FFFF
         lb = np.uint64(np.uint32(upper_range) + 1)
