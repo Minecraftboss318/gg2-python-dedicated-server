@@ -3,7 +3,7 @@ import socket
 import time
 import threading
 import numpy as np
-import upnpy
+import miniupnpc
 import math
 import os.path
 from io import BytesIO
@@ -89,36 +89,24 @@ def server_registration():
 
 
 def upnp_port_mapping():
+    # UPNP port forwarding
+    upnp = miniupnpc.UPnP()
+    # Gets devices
+    devices = upnp.discover()
+    # Gets router I think
+    device = upnp.selectigd()
+    # Gets host's local ip
+    HOST_IP = upnp.lanaddr
     while True:
-        # Gets host local ip
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as temp_socket:
-            temp_socket.connect(("8.8.8.8", 80))
-            HOST_IP = temp_socket.getsockname()[0]
-
-        # UPNP port forwarding
-        upnp = upnpy.UPnP()
-        # Gets devices
-        devices = upnp.discover()
-        # Gets router I think
-        device = upnp.get_igd()
-        # Gets device services
-        device.get_services()
-        # Sets service
-        service = device["WANIPConn1"]
-        # Gets actions for said service
-        service.get_actions()
-
         # Maps port
-        service.AddPortMapping.get_input_arguments()
-        service.AddPortMapping(
-            NewRemoteHost="",
-            NewExternalPort=SERVER_PORT,
-            NewProtocol="TCP",
-            NewInternalPort=SERVER_PORT,
-            NewInternalClient=HOST_IP,
-            NewEnabled=1,
-            NewPortMappingDescription="GGPDS Port",
-            NewLeaseDuration=150,
+        upnp.addportmapping(
+            SERVER_PORT,
+            "TCP",
+            HOST_IP,
+            SERVER_PORT,
+            "GGPDS Port",
+            "",
+            150
         )
         print("---UPNP Port Mapped---")
         time.sleep(135)
