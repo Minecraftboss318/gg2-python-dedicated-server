@@ -1692,22 +1692,22 @@ REG_PACKET_ONE = struct.pack(
 ) # Registration ID
 REG_PACKET_ONE += struct.pack(
     ">16B",
-    17,
-    211,
-    119,
-    67,
-    190,
-    25,
-    205,
-    141,
-    171,
-    76,
-    89,
-    102,
-    234,
-    11,
-    69,
-    132,
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
+    np.random.randint(256),
 ) # Server ID
 REG_PACKET_ONE += struct.pack(
     ">16B",
@@ -1750,9 +1750,9 @@ REG_PACKET_TWO += struct.pack(">B", 4)
 # Game Name Key
 REG_PACKET_TWO += bytes("game", "utf-8")
 # Game Name Length
-REG_PACKET_TWO += struct.pack(">H", 15)
+REG_PACKET_TWO += struct.pack(">H", 17)
 # Game Name
-REG_PACKET_TWO += bytes("Gang Garrison 2", "utf-8")
+REG_PACKET_TWO += bytes("GG2 Python Server", "utf-8")
 
 # Game Short
 # Game Short Key Length
@@ -1760,9 +1760,9 @@ REG_PACKET_TWO += struct.pack(">B", 10)
 # Game Short Key
 REG_PACKET_TWO += bytes("game_short", "utf-8")
 # Game Short Length
-REG_PACKET_TWO += struct.pack(">H", 3)
+REG_PACKET_TWO += struct.pack(">H", 5)
 # Game Short
-REG_PACKET_TWO += bytes("gg2", "utf-8")
+REG_PACKET_TWO += bytes("GGPDS", "utf-8")
 
 # Game Version
 # Game Version Key Length
@@ -1770,9 +1770,9 @@ REG_PACKET_TWO += struct.pack(">B", 8)
 # Game Version Key
 REG_PACKET_TWO += bytes("game_ver", "utf-8")
 # Game Version Length
-REG_PACKET_TWO += struct.pack(">H", 6)
+REG_PACKET_TWO += struct.pack(">H", 0)
 # Game Version
-REG_PACKET_TWO += bytes("v2.9.2", "utf-8")
+REG_PACKET_TWO += bytes("", "utf-8")
 
 # Game URL
 # Game URL Key Length
@@ -1780,9 +1780,9 @@ REG_PACKET_TWO += struct.pack(">B", 8)
 # Game URL Key
 REG_PACKET_TWO += bytes("game_url", "utf-8")
 # Game URL Length
-REG_PACKET_TWO += struct.pack(">H", 27)
+REG_PACKET_TWO += struct.pack(">H", 63)
 # Game URL
-REG_PACKET_TWO += bytes("http://www.ganggarrison.com", "utf-8")
+REG_PACKET_TWO += bytes("https://github.com/Minecraftboss318/gg2-python-dedicated-server", "utf-8")
 
 # Registration Packet Const 3
 REG_PACKET_THREE = struct.pack(">B", 11)             # Protocol ID Key Length
