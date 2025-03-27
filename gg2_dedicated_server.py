@@ -92,9 +92,9 @@ def upnp_port_mapping():
     # UPNP port forwarding
     upnp = miniupnpc.UPnP()
     # Gets devices
-    devices = upnp.discover()
+    upnp.discover()
     # Gets router I think
-    device = upnp.selectigd()
+    upnp.selectigd()
     # Gets host's local ip
     HOST_IP = upnp.lanaddr
     while True:
@@ -113,25 +113,17 @@ def upnp_port_mapping():
 
 
 def upnp_exit():
-    upnp = upnpy.UPnP()
+    # UPNP port forwarding
+    upnp = miniupnpc.UPnP()
     # Gets devices
-    devices = upnp.discover()
+    upnp.discover()
     # Gets router I think
-    device = upnp.get_igd()
-    # Gets device services
-    device.get_services()
-    # Sets service
-    service = device["WANIPConn1"]
-    # Gets actions for said service
-    service.get_actions()
+    upnp.selectigd()
 
-    service.DeletePortMapping.get_input_arguments()
-    # Finally, add the new port mapping to the IGD
-    # This specific action returns an empty dict: {}
-    service.DeletePortMapping(
-        NewRemoteHost = "",
-        NewExternalPort = SERVER_PORT,
-        NewProtocol = "TCP"
+    # Deletes port mapping
+    upnp.deleteportmapping(
+        SERVER_PORT,
+        "TCP"
     )
 
 
