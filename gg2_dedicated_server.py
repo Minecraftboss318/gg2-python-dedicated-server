@@ -1,14 +1,14 @@
-import struct
-import socket
-import time
-import threading
-import numpy as np
-import miniupnpc
-import math
-import os.path
-from io import BytesIO
-import configparser
 import urllib.request
+import miniupnpc
+import socket
+import struct
+from io import BytesIO
+import os.path
+import configparser
+import numpy as np
+import math
+import threading
+import time
 from constants import *
 import map_data_extractor
 from gm8_like_functions import *
@@ -166,10 +166,10 @@ def gm8_round(input_num):
 # --------------------------------------------------------------------------
 # ----------------------------------Classes---------------------------------
 # --------------------------------------------------------------------------
-class objectMask:
-    def __init__(self, xPos1, yPos1, width, height):
-        self.x = xPos1
-        self.y = yPos1
+class ObjectMask:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
         self.width = width
         self.height = height
         
@@ -286,7 +286,7 @@ class JoiningPlayer:
                 print("Received Reserve Slot")
                 # Generates player ID for new player
                 client_player_id = np.random.randint(1000, 10000)
-                while(client_player_id in player_list):
+                while client_player_id in player_list:
                     client_player_id = np.random.randint(1000, 10000)
 
                 name_length = self.conn.recv(1)[0]
@@ -331,7 +331,7 @@ class JoiningPlayer:
                     to_send.write(struct.pack(">BBBBBB",
                         PLAYER_CHANGECLASS,
                         player_index,
-                        joining_player._class,
+                        joining_player.class_,
                         PLAYER_CHANGETEAM,
                         player_index,
                         joining_player.team))
@@ -358,12 +358,12 @@ class JoiningPlayer:
 
     
 class Player:
-    def __init__(self, connection, _id, name, team, _class):
-        self._id = _id
+    def __init__(self, connection, id_, name, team, class_):
+        self.id_ = id_
         
         self.character_object = None
         self.team = team
-        self._class = _class
+        self.class_ = class_
         self.connection = connection
         self.name = name
         self.kicked = False
@@ -397,25 +397,25 @@ class Player:
 
     def respawn(self):
         # Player Spawning
-        if self._class == CLASS_SCOUT:
+        if self.class_ == CLASS_SCOUT:
             self.character_object = Scout(self)
-        elif self._class == CLASS_SOLDIER:
+        elif self.class_ == CLASS_SOLDIER:
             self.character_object = Soldier(self)
-        elif self._class == CLASS_SNIPER:
+        elif self.class_ == CLASS_SNIPER:
             self.character_object = Sniper(self)
-        elif self._class == CLASS_DEMOMAN:
+        elif self.class_ == CLASS_DEMOMAN:
             self.character_object = Demoman(self)
-        elif self._class == CLASS_MEDIC:
+        elif self.class_ == CLASS_MEDIC:
             self.character_object = Medic(self)
-        elif self._class == CLASS_ENGINEER:
+        elif self.class_ == CLASS_ENGINEER:
             self.character_object = Engineer(self)
-        elif self._class == CLASS_HEAVY:
+        elif self.class_ == CLASS_HEAVY:
             self.character_object = Heavy(self)
-        elif self._class == CLASS_SPY:
+        elif self.class_ == CLASS_SPY:
             self.character_object = Spy(self)
-        elif self._class == CLASS_PYRO:
+        elif self.class_ == CLASS_PYRO:
             self.character_object = Pyro(self)
-        elif self._class == CLASS_QUOTE:
+        elif self.class_ == CLASS_QUOTE:
             self.character_object = Quote(self)
 
         game_server.server_to_send.write(struct.pack(">BB", PLAYER_SPAWN, player_list.index(self)))
@@ -514,7 +514,7 @@ class Character:
         self.aim_distance = 0
 
         # Spinjumping state var
-        if 90 <= self.aim_direction and self.aim_direction <= 270:
+        if 90 <= self.aim_direction <= 270:
             self.image_xscale = -1
         else:
             self.image_xscale = 1
@@ -573,33 +573,33 @@ class Character:
         self.highest_base_max_speed = 9.735  # Approximation error < 0.0017 of scout's base max speed
 
         # Create weapon
-        if self.player_object._class == CLASS_SCOUT:
+        if self.player_object.class_ == CLASS_SCOUT:
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_SOLDIER:
+        elif self.player_object.class_ == CLASS_SOLDIER:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_SNIPER:
+        elif self.player_object.class_ == CLASS_SNIPER:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_DEMOMAN:
+        elif self.player_object.class_ == CLASS_DEMOMAN:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_MEDIC:
+        elif self.player_object.class_ == CLASS_MEDIC:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_ENGINEER:
+        elif self.player_object.class_ == CLASS_ENGINEER:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_HEAVY:
+        elif self.player_object.class_ == CLASS_HEAVY:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_SPY:
+        elif self.player_object.class_ == CLASS_SPY:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_PYRO:
+        elif self.player_object.class_ == CLASS_PYRO:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
-        elif self.player_object._class == CLASS_QUOTE:
+        elif self.player_object.class_ == CLASS_QUOTE:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
 
@@ -616,7 +616,7 @@ class Character:
     def good_move_contact_solid(self, arg0, arg1):
         # Function from GG2
         if arg1 <= 0:
-            return 0;
+            return 0
 
         MAX_I = 8
         i = 8
@@ -753,7 +753,7 @@ class Character:
         if on_non_surfing_ground:
             self.move_status = 0
         if on_ground:
-            self.double_jump_used = 0;
+            self.double_jump_used = 0
 
         # Afterburn here
 
@@ -783,9 +783,9 @@ class Character:
                     # Double Jumping
                     want_to_jump = False
                     self.vspeed = -self.jump_strength
-                    on_ground = False;
+                    on_ground = False
                     self.double_jump_used = 1
-                    self.move_status = 0;
+                    self.move_status = 0
 
         # Friction based on move status
         if self.move_status == 1:
@@ -815,10 +815,10 @@ class Character:
             if not self.taunting and not self.omnomnomnom:
                 if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x40) and self.hspeed >= -self.base_max_speed:
                     self.hspeed = gm8_round(self.hspeed - (self.run_power * self.control_factor * skip_delta_factor))
-                    controlling = True;
+                    controlling = True
                 if num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x20) and self.hspeed <= self.base_max_speed:
                     self.hspeed = gm8_round(self.hspeed + (self.run_power * self.control_factor * skip_delta_factor))
-                    controlling = not controlling;
+                    controlling = not controlling
 
             if abs(self.hspeed) > self.base_max_speed * 2 or (num_to_bool((hex_as_int(self.key_state) | hex_as_int(self.pressed_keys)) & 0x60) and abs(self.hspeed) < self.base_max_speed):
                 self.hspeed = gm8_round(self.hspeed / (self.base_friction * skip_delta_factor + (1-1*skip_delta_factor)))
@@ -844,7 +844,7 @@ class Character:
         self.vspeed = min(abs(self.vspeed), 15) * sign(self.vspeed)
 
         # Updating xscale
-        if 90 <= self.aim_direction and self.aim_direction <= 270:
+        if 90 <= self.aim_direction <= 270:
             self.image_xscale = -1
         else:
             self.image_xscale = 1
@@ -878,13 +878,13 @@ class Character:
         if self.vspeed > 10:
             self.vspeed = 10
             
-        yprevious = self.y;
-        xprevious = self.x;
+        yprevious = self.y
+        xprevious = self.x
         y_previous = self.y
         x_previous = self.x
 
-        doHit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor, loaded_map.wm_collision_rects)
-        if doHit:
+        do_hit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor, loaded_map.wm_collision_rects)
+        if do_hit:
             # Theres been a collision with the map Wallmask
             self.character_hit_obstacle()
         else:
@@ -932,7 +932,7 @@ class Character:
 
 class Scout(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33  Works: -5.5, -9.5, 12, 33
+        self.collision_mask = ObjectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33  Works: -5.5, -9.5, 12, 33
         self.base_run_power = 1.4
         self.max_hp = 100
         #self.weapons = ["Scattergun"]
@@ -946,7 +946,7 @@ class Scout(Character):
 
 class Soldier(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
+        self.collision_mask = ObjectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 160
         #self.weapons = ["Rocketlauncher"]
@@ -958,7 +958,7 @@ class Soldier(Character):
 
 class Sniper(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
+        self.collision_mask = ObjectMask(-5.5, -7.5, 12, 31) #-6, -8, 12, 31
         self.base_run_power = 0.9
         self.max_hp = 120
         #self.weapons = ["Rifle"]
@@ -970,7 +970,7 @@ class Sniper(Character):
 
 class Demoman(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-6.5, -9.5, 14, 33) #-7, -10, 14, 33
+        self.collision_mask = ObjectMask(-6.5, -9.5, 14, 33) #-7, -10, 14, 33
         self.base_run_power = 1
         self.max_hp = 120
         #self.weapons = ["Minegun"]
@@ -982,7 +982,7 @@ class Demoman(Character):
 
 class Medic(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-6.5, -7.5, 14, 31) #-7, -8, 14, 31
+        self.collision_mask = ObjectMask(-6.5, -7.5, 14, 31) #-7, -8, 14, 31
         self.base_run_power = 1.09
         self.max_hp = 120
         #self.weapons = ["Medigun"]
@@ -995,7 +995,7 @@ class Medic(Character):
 
 class Engineer(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33 
+        self.collision_mask = ObjectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
         self.base_run_power = 1
         self.max_hp = 120
         #self.weapons = ["Shotgun"]
@@ -1007,7 +1007,7 @@ class Engineer(Character):
 
 class Heavy(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-8.5, -11.5, 18, 35) #-9, -12, 18, 35
+        self.collision_mask = ObjectMask(-8.5, -11.5, 18, 35) #-9, -12, 18, 35
         self.base_run_power = 0.8
         self.max_hp = 200
         #self.weapons = ["Minigun"]
@@ -1019,7 +1019,7 @@ class Heavy(Character):
 
 class Spy(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
+        self.collision_mask = ObjectMask(-5.5, -9.5, 12, 33) #-6, -10, 12, 33
         self.base_run_power = 1.08
         self.max_hp = 100
         #self.weapons = ["Revolver"]
@@ -1032,7 +1032,7 @@ class Spy(Character):
 
 class Pyro(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-6.5, -5.5, 14, 29) #-7, -6, 14, 29
+        self.collision_mask = ObjectMask(-6.5, -5.5, 14, 29) #-7, -6, 14, 29
         self.base_run_power = 1.1
         self.max_hp = 120
         #self.weapons = ["Flamethrower"]
@@ -1045,7 +1045,7 @@ class Pyro(Character):
 
 class Quote(Character):
     def __init__(self, player_object):
-        self.collision_mask = objectMask(-6.5, -11.5, 14, 23) #-7, -12, 14, 23
+        self.collision_mask = ObjectMask(-6.5, -11.5, 14, 23) #-7, -12, 14, 23
         self.base_run_power = 1.07
         self.max_hp = 140
         #self.weapons = ["Blade"]
@@ -1090,7 +1090,6 @@ class Scattergun(Weapon):
             self.reload_alarm = self.reload_time / delta_factor
 
     def fire_weapon(self):
-        to_send = BytesIO()
         if self.ready_to_shoot and self.ammo_count > 0:
             np.seterr(over='ignore')
             lcg_rand = LcgRandom()
@@ -1134,7 +1133,7 @@ class Scattergun(Weapon):
 
 class Shot:
     def __init__(self, owner, x, y, direction, speed):
-        self.collision_mask = objectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
+        self.collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
         self.rotatable = True
         self.x = x
         self.y = y
@@ -1177,11 +1176,11 @@ class Shot:
         
     def collision_step(self):
         for player in player_list:
-            if player._id != 1000 and player != self.owner_player and player != self.team:
+            if player.id_ != 1000 and player != self.owner_player and player != self.team:
                 if player.character_object is not None:
                     # Change out this bad temp solution later
                     existing_mask = player.character_object.collision_mask
-                    temp_mask = objectMask(player.character_object.x + existing_mask.x, player.character_object.y + existing_mask.y, existing_mask.width, existing_mask.height)
+                    temp_mask = ObjectMask(player.character_object.x + existing_mask.x, player.character_object.y + existing_mask.y, existing_mask.width, existing_mask.height)
                     if not place_free(self, self.x, self.y, [temp_mask]):
                         player.character_object.hp -= 8
                         player.character_object.hspeed = gm8_round(player.character_object.hspeed + (self.hspeed * 0.03))
@@ -1264,8 +1263,8 @@ class GG2Map:
 
 class GameServer:
     def __init__(self):
-        self.server_to_send = bytes("", "utf-8")
-        self.new_connections = [];
+        self.server_to_send = BytesIO()
+        self.new_connections = []
 
     def serialize_state(self, update_type):
         to_send = BytesIO()
@@ -1472,11 +1471,11 @@ class GameServer:
                 player_to_service.character_object = None
                 # Player Set Class
                 data = conn.recv(1)
-                player_to_service._class = data[0]
+                player_to_service.class_ = data[0]
                 self.server_to_send.write(struct.pack("<BBB",
                     PLAYER_CHANGECLASS,
                     player_list.index(player_to_service),
-                    player_to_service._class))
+                    player_to_service.class_))
 
             elif data[0] == INPUTSTATE:
                 data = conn.recv(4)
@@ -1503,7 +1502,7 @@ class GameServer:
                     and not player_to_service.character_object.taunting
                     and not player_to_service.character_object.omnomnomnom
                     and player_to_service.character_object.can_eat
-                    and player_to_service._class == CLASS_HEAVY):
+                    and player_to_service.class_ == CLASS_HEAVY):
                         self.server_to_send.write(struct.pack("<BB",
                             OMNOMNOMNOM,
                             player_list.index(player_to_service)))
@@ -1511,7 +1510,7 @@ class GameServer:
 
             elif data[0] == TOGGLE_ZOOM:
                 if player_to_service.character_object is not None:
-                    if player_to_service._class == CLASS_SNIPER:
+                    if player_to_service.class_ == CLASS_SNIPER:
                         self.server_to_send.write(struct.pack("<BB",
                             TOGGLE_ZOOM,
                             player_list.index(player_to_service)))
@@ -1537,7 +1536,7 @@ class GameServer:
     def process_client_alarms(self):
         # FIX ALARMS (If the alarm is at 0 which it will be a lot then it will CONSTANTLY RUN)
         for player_to_service in player_list:
-            if player_to_service._id != 1000:
+            if player_to_service.id_ != 1000:
                 # Respawn Alarm
                 if player_to_service.respawn_timer > 0:
                     player_to_service.respawn_timer -= 1
@@ -1545,8 +1544,7 @@ class GameServer:
                         and player_to_service.character_object is None
                         and (player_to_service.team == TEAM_RED
                              or player_to_service.team == TEAM_BLUE)
-                        and (0 <= player_to_service._class
-                             and player_to_service._class <= 9)):
+                        and (0 <= player_to_service.class_ <= 9)):
                     player_to_service.respawn()
 
                 if player_to_service.character_object is not None:
@@ -1583,7 +1581,7 @@ class GameServer:
             if len(player_list) > 1:
                 # Processes player/client commands
                 for player_to_service in player_list:
-                    if player_to_service._id != 1000:
+                    if player_to_service.id_ != 1000:
                         self.process_client_commands(player_to_service)
 
                 # Send players server update
@@ -1595,7 +1593,7 @@ class GameServer:
                     
                 # Begin step collisions
                 for player_to_service in player_list:
-                    if player_to_service._id != 1000:
+                    if player_to_service.id_ != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.begin_step()
                     
@@ -1604,7 +1602,7 @@ class GameServer:
 
                 # Position/physics object updating here
                 for player_to_service in player_list:
-                    if player_to_service._id != 1000:
+                    if player_to_service.id_ != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.normal_step()
 
@@ -1612,7 +1610,7 @@ class GameServer:
                     bullet.normal_step()
 
                 for player_to_service in player_list:
-                    if player_to_service._id != 1000:
+                    if player_to_service.id_ != 1000:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
 
@@ -1633,7 +1631,7 @@ class GameServer:
             # Sends update to all players
             if self.server_to_send:
                 for player_to_service in player_list:
-                    if player_to_service._id != 1000:
+                    if player_to_service.id_ != 1000:
                         try:
                             conn = player_to_service.connection
                             conn.sendall(self.server_to_send.getvalue())
@@ -1812,7 +1810,7 @@ REG_PACKET_THREE += PROTOCOL_ID
 
 def main():
     # Maps UPNP port if UPNP is enabled
-    if USE_UPNP == True:
+    if USE_UPNP:
         upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
         upnp_thread.start()
         time.sleep(5)

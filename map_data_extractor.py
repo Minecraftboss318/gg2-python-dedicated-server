@@ -1,16 +1,11 @@
-import subprocess
-import struct
-import json
-import zlib
-import time
 from PIL import Image
-from typing import BinaryIO, List, Tuple
+import json
 
 
-class rectangle:
-    def __init__(self, xPos, yPos):
-        self.x = xPos * 6
-        self.y = yPos * 6
+class Rectangle:
+    def __init__(self, x, y):
+        self.x = x * 6
+        self.y = y * 6
         self.width = 6
         self.height = 6
 
@@ -28,7 +23,7 @@ def generate_wall_mask_array(width, height, wm):
                 if current_rect is not None:
                     current_rect.width += 6
                 else:
-                    current_rect = rectangle(j, i)
+                    current_rect = Rectangle(j, i)
             else:
                 if current_rect is not None:
                     wm_rects.append(current_rect)
@@ -86,7 +81,7 @@ def get_image_entities(map_image_data):
         image_entities = image_entities.replace('"{', '{')
         image_entities = image_entities.replace("}", "}\n")
         
-        pos = 0;
+        pos = 0
         while image_entities.find(":", pos) != -1:
             pos = image_entities.find(":", pos) + 1
             found_char = image_entities[pos]
@@ -126,7 +121,7 @@ def get_image_entities(map_image_data):
 # ------------------------
 # Code to extract wallmask
 # ------------------------
-def get_image_wallmask(map_image_data, map_name):
+def get_image_wallmask(map_image_data):
     wall_mask_start = map_image_data.find("{WALKMASK}") + 11
     wall_mask_end = map_image_data.find(".{END WALKMASK}")
     image_wm_data = map_image_data[wall_mask_start:wall_mask_end]
@@ -188,7 +183,7 @@ def extract_map_data(map_name):
 
     return [
         get_image_entities(map_image_data),
-        get_image_wallmask(map_image_data, map_name),
+        get_image_wallmask(map_image_data),
     ]
 
 
