@@ -750,7 +750,7 @@ class Character:
         # Afterburn here
 
         # Input Handling
-        if False:
+        if self.player_object.queue_jump:
             if num_to_bool(hex_as_int(self.pressed_keys) & 0x80):
                 want_to_jump = True
             elif num_to_bool(hex_as_int(self.released_keys) & 0x80):
@@ -761,12 +761,12 @@ class Character:
                 self.current_weapon.fire_weapon()
             if not self.player_object.humiliated and self.pressed_keys & 0x01:
                 # Taunting Stuff
-                if False:
-                    pass
+                if self.invisible == False and self.cloak_alpha == 1:
+                    self.taunting = True
 
             if ((num_to_bool(hex_as_int(self.pressed_keys) & 0x80)) or (False and want_to_jump)) and self.vspeed > -self.jump_strength:
                 if on_ground and not stuck_in_wall:
-                    if True:
+                    if not self.stabbing:
                         # Jumping
                         want_to_jump = False
                         self.vspeed = -self.jump_strength
@@ -801,6 +801,8 @@ class Character:
                 self.control_factor = self.base_control
             self.friction_factor = self.base_friction
 
+        rocket_jumping = (self.move_status == 1 or self.move_status == 2 or self.move_status == 4)
+
         # Horizonal Movement
         controlling = False
         for x in range(frameskip):
@@ -826,7 +828,7 @@ class Character:
             self.hspeed = 0
 
         if not on_ground and not stuck_in_wall:
-            if False:
+            if rocket_jumping:
                 self.applied_gravity = gm8_round(self.applied_gravity + 0.54)
             else:
                 self.applied_gravity = gm8_round(self.applied_gravity + 0.6)
