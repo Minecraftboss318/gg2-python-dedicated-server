@@ -4,6 +4,11 @@ import math
 np.seterr(over='ignore')
 
 
+# GM8's internal rounding
+def gm8_round(input_num):
+    return math.floor(input_num * 1000000000 + 0.5) / 1000000000
+
+
 # returns wether number is positive, negative, or neither
 def sign(input_num):
     if input_num < 0:
@@ -16,23 +21,23 @@ def sign(input_num):
 
 # returns line's angle in degrees
 def point_direction(x1, y1, x2, y2):
-    return math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360
+    return gm8_round(math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360)
 
 # converts degrees to radians
 def degtorad(degrees):
-    return degrees * math.pi / 180
+    return gm8_round(math.radians(degrees))
 
 
 # returns whether an object at the provided position is
 # colliding with the provided rectangles
-def place_free(obj, xPos, yPos, collision_rects):
+def place_free(obj, x, y, collision_rects):
     collisions = []
     direction = 0
     if obj.rotatable:
         direction = point_direction(obj.x, obj.y, obj.x + obj.hspeed, obj.y + obj.vspeed)
     rect2_x, rect2_y, rect2_w, rect2_h = obj.collision_mask.rotated_mask(direction)
-    rect2_x += xPos
-    rect2_y += yPos
+    rect2_x += x
+    rect2_y += y
 
     for rect1 in collision_rects:
         if (rect1.x <= rect2_x + rect2_w and

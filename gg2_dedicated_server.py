@@ -136,24 +136,6 @@ def num_to_bool(input_num):
     else:
         return False
 
-def sign(input_num):
-    if input_num < 0:
-        return -1
-    elif 0 < input_num:
-        return 1
-    else:
-        return 0
-
-def point_direction(x1, y1, x2, y2):
-    return math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360
-
-def degtorad(degrees):
-    return degrees * math.pi / 180
-
-# GM8's internal rounding
-def gm8_round(input_num):
-    return math.floor(input_num * 1000000000 + 0.5) / 1000000000
-
 
 # --------------------------------------------------------------------------
 # ----------------------------------Classes---------------------------------
@@ -1807,7 +1789,7 @@ def main():
     if USE_UPNP:
         upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
         upnp_thread.start()
-        time.sleep(5)
+        time.sleep(2)
 
     # Gets map entities and wallmask
     global loaded_map
