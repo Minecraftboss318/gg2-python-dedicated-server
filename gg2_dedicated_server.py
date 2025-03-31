@@ -82,9 +82,9 @@ def server_registration():
             + REG_PACKET_THREE)
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            # sock.sendto(packet, (UDP_IP, UDP_PORT)) #UDP WAY
-            sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # COOLER TCP WAY
-            sock.send(packet)
+            sock.sendto(packet, (REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # WAY COOLER UDP WAY
+            # sock.connect((REG_LOBBY_DOMAIN, REG_LOBBY_PORT)) # TCP WAY
+            # sock.send(packet)
         print("---Registration Packet Sent---")
 
 
