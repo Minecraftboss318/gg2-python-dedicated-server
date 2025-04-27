@@ -125,6 +125,7 @@ def upnp_exit():
         SERVER_PORT,
         "TCP"
     )
+    print("UPNP Port Mapping Removed")
 
 
 def hex_as_int(input_value):
@@ -1807,13 +1808,17 @@ def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         s.bind(("", SERVER_PORT))
+        s.settimeout(0)
         s.listen()
         print(f"Listening on port {SERVER_PORT}")
         while True:
-            conn, addr = s.accept()
-            print("Accepted connection from", addr)
-            joining_client = JoiningPlayer(conn)
-            joining_players.append(joining_client)
+            try:
+                conn, addr = s.accept()
+                print("Accepted connection from", addr)
+                joining_client = JoiningPlayer(conn)
+                joining_players.append(joining_client)
+            except BlockingIOError:
+                time.sleep(0.3)
 
 
 if __name__ == "__main__":
@@ -1824,7 +1829,9 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"EXCEPTION: {e}")
     finally:
+        print("")
         if USE_UPNP:
             upnp_exit()
 
+        print("Server Stopped")
         exit()
