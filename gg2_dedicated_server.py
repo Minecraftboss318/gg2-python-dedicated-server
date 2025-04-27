@@ -1154,10 +1154,7 @@ class Shot:
         for player in player_list:
             if player.id_ != 1000 and player != self.owner_player and player != self.team:
                 if player.character_object is not None:
-                    # Change out this bad temp solution later
-                    existing_mask = player.character_object.collision_mask
-                    temp_mask = ObjectMask(player.character_object.x + existing_mask.x, player.character_object.y + existing_mask.y, existing_mask.width, existing_mask.height)
-                    if not place_free(self, self.x, self.y, [temp_mask]):
+                    if colliding(self, player.character_object):
                         player.character_object.hp -= 8
                         player.character_object.hspeed = gm8_round(player.character_object.hspeed + (self.hspeed * 0.03))
                         player.character_object.vspeed = gm8_round(player.character_object.vspeed + (self.vspeed * 0.03))

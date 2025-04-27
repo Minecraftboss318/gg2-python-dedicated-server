@@ -50,6 +50,29 @@ def place_free(obj, x, y, collision_rects):
     else:
         return True
 
+# returns whether two objects are colliding
+def colliding(obj1, obj2):
+    direction = 0
+    if obj1.rotatable:
+        direction = point_direction(obj1.x, obj1.y, obj1.x + obj1.hspeed, obj1.y + obj1.vspeed)
+    rect1_x, rect1_y, rect1_w, rect1_h = obj1.collision_mask.rotated_mask(direction)
+    rect1_x += obj1.x
+    rect1_y += obj1.y
+
+    direction = 0
+    if obj2.rotatable:
+        direction = point_direction(obj2.x, obj2.y, obj2.x + obj2.hspeed, obj2.y + obj2.vspeed)
+    rect2_x, rect2_y, rect2_w, rect2_h = obj2.collision_mask.rotated_mask(direction)
+    rect2_x += obj2.x
+    rect2_y += obj2.y
+
+    if (rect1_x <= rect2_x + rect2_w and
+            rect1_x + rect1_w >= rect2_x and
+            rect1_y <= rect2_y + rect2_h and
+            rect1_y + rect1_h >= rect2_y):
+        return True
+    return False
+
 
 # partial implementation of gm8's random functions
 class LcgRandom: 
