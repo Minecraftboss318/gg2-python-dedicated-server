@@ -8,6 +8,11 @@ np.seterr(over='ignore')
 def gm8_round(input_num):
     return math.floor(input_num * 1000000000 + 0.5) / 1000000000
 
+# Faucet Networking like clipping and rounding
+def clip_and_round(input_num, min_num, max_num):
+    input_num = np.clip(input_num, min_num, max_num)
+    return math.floor(abs(input_num) + 0.5) * sign(input_num)
+
 
 # returns wether number is positive, negative, or neither
 def sign(input_num):

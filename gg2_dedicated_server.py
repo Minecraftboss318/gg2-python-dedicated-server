@@ -1281,18 +1281,20 @@ class GameServer:
                     to_send.write(struct.pack(">B", 1))
 
                     # Input & Aiming
-                    to_send.write(struct.pack("<BHB", joining_player.character_object.key_state,
-                        joining_player.character_object.net_aim_direction,
-                        int(round(joining_player.character_object.aim_distance/2))))
+                    to_send.write(struct.pack("<BHB",
+                        clip_and_round(joining_player.character_object.key_state, 0, 255),
+                        clip_and_round(joining_player.character_object.net_aim_direction, 0, 65535),
+                        clip_and_round(joining_player.character_object.aim_distance/2, 0, 255)))
                     
                     if update_type == QUICK_UPDATE or update_type == FULL_UPDATE:
-                        to_send.write(struct.pack("<HHbbBBB", int(round(joining_player.character_object.x*5)),
-                            int(round(joining_player.character_object.y*5)),
-                            int(round(joining_player.character_object.hspeed*8.5)),
-                            int(round(joining_player.character_object.vspeed*8.5)),
-                            max(math.ceil(joining_player.character_object.hp), 0),
-                            joining_player.character_object.current_weapon.ammo_count,
-                            ((joining_player.character_object.move_status & 0x7) << 1)))
+                        to_send.write(struct.pack("<HHbbBBB",
+                            clip_and_round(joining_player.character_object.x*5, 0, 65535),
+                            clip_and_round(joining_player.character_object.y*5, 0, 65535),
+                            clip_and_round(joining_player.character_object.hspeed*8.5, -128, 127),
+                            clip_and_round(joining_player.character_object.vspeed*8.5, -128, 127),
+                            clip_and_round(math.ceil(joining_player.character_object.hp), 0, 255),
+                            clip_and_round(joining_player.character_object.current_weapon.ammo_count, 0, 255),
+                            clip_and_round(((joining_player.character_object.move_status & 0x7) << 1), 0, 255)))
                         
                     if update_type == FULL_UPDATE:
                         # Temp Misc and Intel values
