@@ -1056,7 +1056,7 @@ class Scattergun(Weapon):
         
         self.recoil_time = self.refire_time
 
-        self.ready_to_shoot_alarm = 0
+        self.ready_to_shoot_alarm = self.refire_time / delta_factor
         self.reload_alarm = 0
 
     def reload(self):
@@ -1307,8 +1307,8 @@ class GameServer:
 
                         # Temp Weapon Values
                         to_send.write(struct.pack("<BB",
-                            max(int(joining_player.character_object.current_weapon.ready_to_shoot), 0),
-                            max(int(joining_player.character_object.current_weapon.ready_to_shoot_alarm), 0)))
+                            clip_and_round(joining_player.character_object.current_weapon.ready_to_shoot, 0, 255),
+                            clip_and_round(joining_player.character_object.current_weapon.ready_to_shoot_alarm, 0, 255)))
                         
                 else:
                     # Subobject count
@@ -1421,6 +1421,7 @@ class GameServer:
                 print("Received Change Team")
                 # Player Death
                 data = conn.recv(1)
+                player_to_service.respawn_timer = 1
                 print("Current team: " + str(player_to_service.team) + " New Team: " + str(data[0]))
                 if player_to_service.team != data[0] and player_to_service.character_object is not None:
                     self.server_to_send.write(struct.pack("<BBBBB",
@@ -1510,13 +1511,12 @@ class GameServer:
             commands_done += 1
 
     def process_client_alarms(self):
-        # FIX ALARMS (If the alarm is at 0 which it will be a lot then it will CONSTANTLY RUN)
         for player_to_service in player_list:
             if player_to_service.id_ != 1000:
                 # Respawn Alarm
-                if player_to_service.respawn_timer > 0:
+                if player_to_service.respawn_timer >= 0:
                     player_to_service.respawn_timer -= 1
-                if (player_to_service.respawn_timer <= 0
+                if (player_to_service.respawn_timer == 0
                         and player_to_service.character_object is None
                         and (player_to_service.team == TEAM_RED
                              or player_to_service.team == TEAM_BLUE)
@@ -1524,14 +1524,14 @@ class GameServer:
                     player_to_service.respawn()
 
                 if player_to_service.character_object is not None:
-                    if player_to_service.character_object.current_weapon.reload_alarm > 0:
+                    if player_to_service.character_object.current_weapon.reload_alarm >= 0:
                         player_to_service.character_object.current_weapon.reload_alarm -= 1
-                    if player_to_service.character_object.current_weapon.reload_alarm <= 0:
+                    if player_to_service.character_object.current_weapon.reload_alarm == 0:
                         player_to_service.character_object.current_weapon.reload()
 
-                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm > 0:
+                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm >= 0:
                         player_to_service.character_object.current_weapon.ready_to_shoot_alarm -= 1
-                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm <= 0:
+                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm == 0:
                         player_to_service.character_object.current_weapon.ready_shooting()
 
 
