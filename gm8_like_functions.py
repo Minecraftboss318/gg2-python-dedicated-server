@@ -1,12 +1,19 @@
 import numpy as np
 import ctypes
 import math
+#import decimal
 np.seterr(over='ignore')
 
 
-# GM8's internal rounding
+# GM8's internal rounding (Missing floating point precision weirdness GM8 has)
 def gm8_round(input_num):
-    return math.floor(input_num * 1000000000 + 0.5) / 1000000000
+    return math.floor(abs(input_num * 1000000000) + 0.5) / 1000000000 * sign(input_num)
+    '''
+    if 9 < abs(decimal.Decimal(str(input_num)).as_tuple().exponent):
+        return float(decimal.Context(prec=10, rounding=decimal.ROUND_UP).create_decimal(input_num))
+    else:
+        return input_num
+    '''
 
 # Faucet Networking like clipping and rounding
 def clip_and_round(input_num, min_num, max_num):
