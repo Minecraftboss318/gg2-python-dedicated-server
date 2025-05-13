@@ -1,19 +1,17 @@
 import numpy as np
 import ctypes
 import math
-#import decimal
+import decimal
 np.seterr(over='ignore')
 
 
-# GM8's internal rounding (Missing floating point precision weirdness GM8 has)
-def gm8_round(input_num):
-    return math.floor(abs(input_num * 1000000000) + 0.5) / 1000000000 * sign(input_num)
-    '''
-    if 9 < abs(decimal.Decimal(str(input_num)).as_tuple().exponent):
-        return float(decimal.Context(prec=10, rounding=decimal.ROUND_UP).create_decimal(input_num))
-    else:
-        return input_num
-    '''
+# GM8's rounding for numbers displayed in the debug window (Missing floating point precision weirdness GM8 has)
+#def gm8_debug_round(input_num):
+    #if abs(int(input_num)) <= 9999999999:
+    #    return float(decimal.Context(prec=10, rounding=decimal.ROUND_HALF_UP).create_decimal(input_num))
+    #else:
+    #return int(input_num)
+
 
 # Faucet Networking like clipping and rounding
 def clip_and_round(input_num, min_num, max_num):
@@ -33,11 +31,11 @@ def sign(input_num):
 
 # returns line's angle in degrees
 def point_direction(x1, y1, x2, y2):
-    return gm8_round(math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360)
+    return math.degrees(math.atan2(-(y2-y1), x2-x1)) % 360
 
 # converts degrees to radians
 def degtorad(degrees):
-    return gm8_round(math.radians(degrees))
+    return math.radians(degrees)
 
 
 # returns whether an object at the provided position is
