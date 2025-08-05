@@ -52,10 +52,10 @@ def generate_wall_mask_array(width, height, wm):
 class LegacyEntity:
     def __init__(self, _type, x, xscale, y, yscale):
         self.type = _type
-        self.x = x
-        self.xscale = xscale
-        self.y = y
-        self.yscale = yscale
+        self.x = int(x)
+        self.xscale = int(xscale)
+        self.y = int(y)
+        self.yscale = int(yscale)
 
 
 class Entity:
