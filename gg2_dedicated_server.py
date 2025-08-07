@@ -1163,6 +1163,7 @@ class Shot:
                         player.character_object.hspeed = player.character_object.hspeed + (self.hspeed * 0.03)
                         player.character_object.vspeed = player.character_object.vspeed + (self.vspeed * 0.03)
                         bullet_list.remove(self)
+                        break
 
 
 class GG2Map:
