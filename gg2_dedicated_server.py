@@ -1,5 +1,4 @@
 import urllib.request
-import sys
 import miniupnpc
 import socket
 import struct
@@ -27,8 +26,6 @@ if not os.path.isfile("server_conf.ini"):
 
     with open("server_conf.ini", "w") as configfile:
         config.write(configfile)
-
-    sys.exit("Created default server config; rerun command to launch server.")
 
 # Reads in server configuration values
 config.read("server_conf.ini")
