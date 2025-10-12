@@ -15,7 +15,7 @@ np.seterr(over='ignore')
 
 # Faucet Networking like clipping and rounding
 def clip_and_round(input_num, min_num, max_num):
-    input_num = np.clip(input_num, min_num, max_num)
+    input_num = max(min_num, min(input_num, max_num))
     return math.floor(abs(input_num) + 0.5) * sign(input_num)
 
 
