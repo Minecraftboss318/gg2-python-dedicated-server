@@ -1387,9 +1387,9 @@ class GameServer:
         commands_done = 0
         
         while 10 > commands_done:
-            data = None
+            recieved_command = None
             try:
-                data = conn.recv(1)
+                recieved_command = conn.recv(1)[0]
             except ConnectionError:
                 if player_to_service not in players_to_remove:
                     players_to_remove.append(player_to_service)
@@ -1404,27 +1404,29 @@ class GameServer:
                 commands_done = 10
                 break
 
-            if not data:
+            if not recieved_command:
                 commands_done = 10
                 break
             
             # print("Received Player Data")
-            # print(data[0])
-            # print(data)
+            # print(recieved_command[0])
+            # print(recieved_command)
 
             # Reactions to client data
-            if data[0] == PLAYER_LEAVE:
+            if recieved_command == PLAYER_LEAVE:
                 print("Player Left???")
                 if player_to_service not in players_to_remove:
                     players_to_remove.append(player_to_service)
 
-            elif data[0] == PLAYER_CHANGETEAM:
+            elif recieved_command == PLAYER_CHANGETEAM:
                 print("Received Change Team")
+                new_team = conn.recv(1)[0]
+                if new_team < 0 or 2 < new_team:
+                    new_team = np.random.randint(0, 2)
+                print("Current team: " + str(player_to_service.team) + " New Team: " + str(new_team))
                 # Player Death
-                data = conn.recv(1)
                 player_to_service.respawn_timer = 1
-                print("Current team: " + str(player_to_service.team) + " New Team: " + str(data[0]))
-                if player_to_service.team != data[0] and player_to_service.character_object is not None:
+                if player_to_service.team != new_team and player_to_service.character_object is not None:
                     self.server_to_send.write(struct.pack("<BBBBB",
                         10,
                         player_list.index(player_to_service),
@@ -1437,25 +1439,25 @@ class GameServer:
                     player_to_service.character_object = None
                     
                 # Player Set Team
-                player_to_service.team = data[0]
+                player_to_service.team = new_team
                 self.server_to_send.write(struct.pack("<BBB",
                     PLAYER_CHANGETEAM,
                     player_list.index(player_to_service),
                     player_to_service.team))
 
-            elif data[0] == PLAYER_CHANGECLASS:
+            elif recieved_command == PLAYER_CHANGECLASS:
                 print("Received Change Class")
                 player_to_service.respawn_timer = 5
                 player_to_service.character_object = None
                 # Player Set Class
-                data = conn.recv(1)
-                player_to_service.class_ = data[0]
+                new_class = conn.recv(1)[0]
+                player_to_service.class_ = new_class
                 self.server_to_send.write(struct.pack("<BBB",
                     PLAYER_CHANGECLASS,
                     player_list.index(player_to_service),
                     player_to_service.class_))
 
-            elif data[0] == INPUTSTATE:
+            elif recieved_command == INPUTSTATE:
                 data = conn.recv(4)
                 if player_to_service.character_object is not None:
                     player_to_service.character_object.key_state = data[0]
@@ -1467,14 +1469,14 @@ class GameServer:
                     player_to_service.character_object.released_keys |= ~player_to_service.character_object.key_state & player_to_service.character_object.last_key_state
                     player_to_service.character_object.last_key_state = player_to_service.character_object.key_state
 
-            elif data[0] == CHAT_BUBBLE:
+            elif recieved_command == CHAT_BUBBLE:
                 bubble_image = conn.recv(1)[0]
                 self.server_to_send.write(struct.pack("<BBB",
                     CHAT_BUBBLE,
                     player_list.index(player_to_service),
                     bubble_image))
 
-            elif data[0] == OMNOMNOMNOM:
+            elif recieved_command == OMNOMNOMNOM:
                 if player_to_service.character_object is not None:
                     if (not player_to_service.humiliated
                     and not player_to_service.character_object.taunting
@@ -1486,7 +1488,7 @@ class GameServer:
                             player_list.index(player_to_service)))
                         # Thing needs to happen here
 
-            elif data[0] == TOGGLE_ZOOM:
+            elif recieved_command == TOGGLE_ZOOM:
                 if player_to_service.character_object is not None:
                     if player_to_service.class_ == CLASS_SNIPER:
                         self.server_to_send.write(struct.pack("<BB",
@@ -1494,7 +1496,7 @@ class GameServer:
                             player_list.index(player_to_service)))
                         # Thing needs to happen here
 
-            elif data[0] == PLAYER_CHANGENAME:
+            elif recieved_command == PLAYER_CHANGENAME:
                 name_length = conn.recv(1)[0]
                 name = str(conn.recv(name_length).decode('utf-8'))
                 self.server_to_send.write(struct.pack("<BBB",
@@ -1504,7 +1506,7 @@ class GameServer:
                 self.server_to_send.write(bytes(name, "utf-8"))
                 
             else:
-                print("Not yet added thing")
+                print("Recieved unimplemented command")
                 print(struct.unpack(">B", data))
                 print(struct.unpack(">b", data))
                 print(data)
