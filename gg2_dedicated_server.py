@@ -2,6 +2,7 @@ import urllib.request
 import miniupnpc
 import socket
 import struct
+import sys
 from io import BytesIO
 import os.path
 import configparser
@@ -26,6 +27,8 @@ if not os.path.isfile("server_conf.ini"):
 
     with open("server_conf.ini", "w") as configfile:
         config.write(configfile)
+
+    sys.exit("Created default server config; rerun command to launch server.")
 
 # Reads in server configuration values
 config.read("server_conf.ini")
@@ -1820,6 +1823,7 @@ def main():
     # Maps UPNP port if UPNP is enabled
     if USE_UPNP:
         upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
+        upnp_thread.daemon = True
         upnp_thread.start()
         time.sleep(2)
 
@@ -1834,6 +1838,7 @@ def main():
         target = GameServer.run_game_server_networking,
         args = (game_server,)
     )
+    server_networking_thread.daemon = True
     server_networking_thread.start()
 
     time.sleep(0.05)
@@ -1867,4 +1872,4 @@ if __name__ == "__main__":
             upnp_exit()
 
         print("Server Stopped")
-        exit()
+        sys.exit()
