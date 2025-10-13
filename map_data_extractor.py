@@ -1,4 +1,5 @@
 from PIL import Image
+import hashlib
 import json
 
 
@@ -172,7 +173,7 @@ def get_image_wallmask(map_image_data):
 
 # Only ever call this to extract embeded image data
 def extract_map_data(map_name):
-    map_image = Image.open(map_name)
+    map_image = Image.open(str(map_name) + ".png")
     map_image.load()
     map_image_data = str(map_image.info)
 
@@ -182,9 +183,45 @@ def extract_map_data(map_name):
     map_image_data = map_image_data[entities_start:entities_end]
 
     return [
+        map_name,
+        get_map_md5(map_name),
         get_image_entities(map_image_data),
         get_image_wallmask(map_image_data),
     ]
 
 
-#extract_map_data("ctf_eiger.png")
+def get_map_md5(map_name):
+    GG2_INTERNAL_MAP_NAMES = [
+        "ctf_truefort",
+        "ctf_2dfort",
+        "ctf_2dfort2",
+        "ctf_2dfortremix",
+        "ctf_conflict",
+        "ctf_classicwell",
+        "ctf_waterway",
+        "ctf_orange",
+        "ctf_avanti",
+        "cp_dirtbowl",
+        "cp_egypt",
+        "arena_montane",
+        "arena_lumberyard",
+        "gen_destroy",
+        "koth_harvest",
+        "koth_valley",
+        "koth_corinth",
+        "dkoth_atalia",
+        "dkoth_sixties",
+        "dkoth_60s",
+        "tdm_mantic",
+        "ctf_2dfort[0]",
+        "ctf_2dfort1",
+        "ctf_oldfort",
+        "gg_debug",
+        "koth_gallery",
+        "ctf_eiger"]
+
+    if map_name in GG2_INTERNAL_MAP_NAMES:
+        return ""
+    else:
+        with open(str(map_name) + ".png", "rb") as map_file:
+            return str(hashlib.md5(map_file.read()).hexdigest())

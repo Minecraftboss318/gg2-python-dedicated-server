@@ -43,9 +43,6 @@ max_players = int(config["Server Settings"]["max_players"])
 server_plugins_required = bool(int(config["Plugin Settings"]["server_plugins_required"]))
 server_plugins_list = str(config["Plugin Settings"]["server_plugin_list"])
 
-# Map file
-map_file_name = "ctf_eiger"
-
 #Frame/Tick Variables
 delta_factor = 1
 skip_delta_factor = 1/2
@@ -68,8 +65,8 @@ def server_registration():
             has_password = struct.pack(">H", 1)
         current_map_key_length = struct.pack(">B", 3)
         current_map_key = bytes("map", "utf-8")
-        current_map_length = struct.pack(">H", len(map_file_name))
-        current_map = bytes(map_file_name, "utf-8")
+        current_map_length = struct.pack(">H", len(loaded_map.name))
+        current_map = bytes(loaded_map.name, "utf-8")
         packet = (REG_PACKET_ONE
             + occupied_slots
             + num_bots
@@ -235,10 +232,10 @@ class JoiningPlayer:
             to_send.write(struct.pack(">B", HELLO))
             to_send.write(struct.pack(">B", len(server_name)))  # Server name length
             to_send.write(bytes(server_name, "utf-8"))  # Server name
-            to_send.write(struct.pack(">B", len(map_file_name)))  # Map name length
-            to_send.write(bytes(map_file_name, "utf-8"))  # Map name
-            to_send.write(struct.pack(">B", 0))  # Map md5 length
-            to_send.write(bytes("", "utf-8"))  # Map md5
+            to_send.write(struct.pack(">B", len(loaded_map.name)))  # Map name length
+            to_send.write(bytes(loaded_map.name, "utf-8"))  # Map name
+            to_send.write(struct.pack(">B", len(loaded_map.md5)))  # Map md5 length
+            to_send.write(bytes(loaded_map.md5, "utf-8"))  # Map md5
 
             plugins_md5_list = ""
             if server_plugins_list:
@@ -293,10 +290,10 @@ class JoiningPlayer:
 
                 # Writes the current map n stuff
                 to_send.write(struct.pack(">B", CHANGE_MAP))
-                to_send.write(struct.pack(">B", len(map_file_name)))  # Map name length
-                to_send.write(bytes(map_file_name, "utf-8"))  # Map name
-                to_send.write(struct.pack(">B", 0))  # Map md5 length
-                to_send.write(bytes("", "utf-8"))  # Map md5
+                to_send.write(struct.pack(">B", len(loaded_map.name)))  # Map name length
+                to_send.write(bytes(loaded_map.name, "utf-8"))  # Map name
+                to_send.write(struct.pack(">B", len(loaded_map.md5)))  # Map md5 length
+                to_send.write(bytes(loaded_map.md5, "utf-8"))  # Map md5
 
                 # Player joining n stuff
                 for player_index, joining_player in enumerate(player_list):
@@ -1165,8 +1162,11 @@ class Shot:
 
 class GG2Map:
     def __init__(self, gg2_map_data):
+        self.name = gg2_map_data[0]
+        self.md5 = gg2_map_data[1]
+        
         # Wallmask rectangles for collision checking
-        self.wm_collision_rects = gg2_map_data[1]
+        self.wm_collision_rects = gg2_map_data[3]
 
         # GG2 map's collision entities
         self.red_spawns = []
@@ -1181,7 +1181,7 @@ class GG2Map:
         self.control_point_two = []
 
         # Assign found entities
-        for entity in gg2_map_data[0]:
+        for entity in gg2_map_data[2]:
             if entity.type == "redspawn":
                 self.red_spawns.append(entity)
             elif entity.type == "bluespawn":
@@ -1794,10 +1794,9 @@ def main():
         upnp_thread.start()
         time.sleep(2)
 
-    # Gets map entities and wallmask
     global loaded_map
-    loaded_map = GG2Map(map_data_extractor.extract_map_data(map_file_name + ".png"))
-    
+    # Gets map md5, entities, and wallmask
+    loaded_map = GG2Map(map_data_extractor.extract_map_data("ctf_eiger"))
 
     # Start Game Server
     global game_server
