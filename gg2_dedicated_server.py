@@ -20,7 +20,7 @@ from gm8_like_functions import *
 # Creates server configuration file if one doesn't exist
 config = configparser.ConfigParser()
 if not os.path.isfile("server_conf.ini"):
-    config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1"}
+    config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1", "total_map_download_bandwitdth_in_bytes_per_second": "50000"}
     config["Server Settings"] = {"server_name": "Python Server", "welcome_message": "", "host_name": "Host", "password": "", "max_players": "10"}
     config["Plugin Settings"] = {"server_plugins_required": "0", "server_plugin_list": ""}
 
@@ -33,6 +33,7 @@ config.read("server_conf.ini")
 SERVER_PORT = int(config["Connection Settings"]["server_port"])
 USE_UPNP = bool(int(config["Connection Settings"]["use_upnp"]))
 REGISTER_SERVER = bool(int(config["Connection Settings"]["use_lobby"]))
+MAP_DOWNLOAD_LIMIT_BPS = int(config["Connection Settings"]["total_map_download_bandwitdth_in_bytes_per_second"])
 # Server Settings
 server_name = str(config["Server Settings"]["server_name"])
 welcome_message = str(config["Server Settings"]["welcome_message"])
@@ -182,22 +183,34 @@ class JoiningPlayer:
         
     def service_connection(self, gameserver_object):
         self.conn.settimeout(0)
-        try:
-            data = self.conn.recv(1)
-        except ConnectionError:
-            print("New Connection Socket Disconnect")
-            return 1
-        except BlockingIOError:
-            return 0
-        if not data:
-            print("New Connection Socket Disconnect")
-            return 1
-        print("Received New Connection Data")
-        print(data)
+        if self.state != STATE_CLIENT_DOWNLOADING:
+            try:
+                data = self.conn.recv(1)
+            except ConnectionError:
+                print("New Connection Socket Disconnect")
+                return 1
+            except BlockingIOError:
+                return 0
+            if not data:
+                print("New Connection Socket Disconnect")
+                return 1
+            print("Received New Connection Data")
+            print(data)
 
         to_send = BytesIO()
 
-        if self.state == STATE_EXPECT_HELLO:
+        if self.state == STATE_CLIENT_DOWNLOADING:
+            # Determines the amount of bytes to send per joining client currently downloading the map
+            bytes_to_send = max(1, math.floor(MAP_DOWNLOAD_LIMIT_BPS/(room_speed*game_server.running_map_downloads)))
+            
+            to_send.write(self.map_download_buffer[0:bytes_to_send])
+            self.map_download_buffer = self.map_download_buffer[bytes_to_send:]
+
+            if len(self.map_download_buffer) <= 0:
+                print("Finished Sending Map")
+                self.new_state = STATE_EXPECT_COMMAND
+
+        elif self.state == STATE_EXPECT_HELLO:
             if data[0] == HELLO:
                 print("Received Hello")
                 data = self.conn.recv(16)
@@ -324,7 +337,17 @@ class JoiningPlayer:
                 print("Connection setup complete")
                 server_registration()
                 return 1
-        print("Sent New Connection Data Back")
+
+            elif data[0] == DOWNLOAD_MAP:
+                print("Received Download Map")
+                if loaded_map.md5 != "":
+                    with open(loaded_map.name + ".png", "rb") as map_file:
+                        self.map_download_buffer = map_file.read()
+                    to_send.write(struct.pack("<I", len(self.map_download_buffer)))
+                    self.new_state = STATE_CLIENT_DOWNLOADING
+
+        if self.state != STATE_CLIENT_DOWNLOADING:        
+            print("Sent New Connection Data Back")
         self.conn.sendall(to_send.getvalue())
         self.state = self.new_state
 
@@ -1239,7 +1262,7 @@ class GG2Map:
 class GameServer:
     def __init__(self):
         self.server_to_send = BytesIO()
-        self.new_connections = []
+        self.running_map_downloads = 0
 
     def serialize_state(self, update_type):
         to_send = BytesIO()
@@ -1625,6 +1648,12 @@ class GameServer:
                         
             # Clears data to send
             self.server_to_send = BytesIO()
+
+            # Gets amount of clients currently downloading map
+            self.running_map_downloads = 0
+            for joining_player in joining_players:
+                if joining_player.state == STATE_CLIENT_DOWNLOADING:
+                    self.running_map_downloads += 1
 
             # Joins one new player each loop
             for joining_player in joining_players:
