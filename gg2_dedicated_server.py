@@ -22,7 +22,7 @@ from gm8_like_functions import *
 # Creates server configuration file if one doesn't exist
 config = configparser.ConfigParser()
 if not os.path.isfile("server_conf.ini"):
-    config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1", "total_map_download_bandwitdth_in_bytes_per_second": "50000"}
+    config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1", "total_map_download_bandwidth_in_bytes_per_second": "50000"}
     config["Server Settings"] = {"server_name": "Python Server", "welcome_message": "", "host_name": "Host", "password": "", "max_players": "10"}
     config["Plugin Settings"] = {"server_plugins_required": "0", "server_plugin_list": ""}
 
@@ -37,7 +37,7 @@ config.read("server_conf.ini")
 SERVER_PORT = int(config["Connection Settings"]["server_port"])
 USE_UPNP = bool(int(config["Connection Settings"]["use_upnp"]))
 REGISTER_SERVER = bool(int(config["Connection Settings"]["use_lobby"]))
-MAP_DOWNLOAD_LIMIT_BPS = int(config["Connection Settings"]["total_map_download_bandwitdth_in_bytes_per_second"])
+MAP_DOWNLOAD_LIMIT_BPS = int(config["Connection Settings"]["total_map_download_bandwidth_in_bytes_per_second"])
 # Server Settings
 server_name = str(config["Server Settings"]["server_name"])
 welcome_message = str(config["Server Settings"]["welcome_message"])
@@ -109,10 +109,10 @@ def create_reg_packet():
     REG_PACKET_THREE = struct.pack(">B", 11)            # Protocol ID Key Length
     REG_PACKET_THREE += bytes("protocol_id", "utf-8")   # Protocol ID Key
     REG_PACKET_THREE += struct.pack(">H", 16)           # Protocol ID Length
-    REG_PACKET_THREE += PROTOCOL_ID
+    REG_PACKET_THREE += PROTOCOL_ID                     # Protocol ID
 
 
-# Updates lobby server of server existance
+# Updates lobby server of server existence
 def server_registration():
     if REGISTER_SERVER:
         # Assembles Packet
@@ -245,6 +245,7 @@ class JoiningPlayer:
         self.client_player = None
         self.new_state = STATE_EXPECT_HELLO
         self.state = self.new_state
+        self.map_download_buffer = bytes()
         print(
             "Connections:"
             f"{len(joining_players) + len(player_list) - 1}\n"
@@ -891,7 +892,7 @@ class Character:
             else:
                 self.hspeed = self.hspeed / (self.friction_factor * skip_delta_factor + (1-1*skip_delta_factor))
 
-        # Reseting key variables
+        # Resetting key variables
         self.pressed_keys = 0
         self.released_keys = 0
 
@@ -951,7 +952,7 @@ class Character:
 
         do_hit = not place_free(self, self.x + self.hspeed * delta_factor, self.y + self.vspeed * delta_factor, loaded_map.wm_collision_rects)
         if do_hit:
-            # Theres been a collision with the map Wallmask
+            # There's been a collision with the map Wallmask
             self.character_hit_obstacle()
         else:
             self.x = self.x + (self.hspeed * delta_factor)
@@ -1197,6 +1198,7 @@ class Scattergun(Weapon):
             self.reload_alarm = (self.reload_buffer + self.reload_time) / delta_factor
             #print("Weapon Fired")
 
+
 class Shot:
     def __init__(self, owner, x, y, direction, speed):
         self.collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
@@ -1219,15 +1221,15 @@ class Shot:
     def normal_step(self):
         self.vspeed += 0.15 * delta_factor
 
-        colliding = False
+        is_colliding = False
         if self.first_step:
-            colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
+            is_colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
 
         self.x += self.hspeed * delta_factor
         self.y += self.vspeed * delta_factor
 
-        colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
-        if colliding:
+        is_colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
+        if is_colliding:
             # Destroy the bullet here
             bullet_list.remove(self)
 
@@ -1368,7 +1370,7 @@ class GameServer:
                         if joining_player != victim:
                             to_send.write(struct.pack(">B", 0))
 
-                # Subojects (Character, Weapon, Sentry)
+                # Subobjects (Character, Weapon, Sentry)
                 if joining_player.character_object is not None:
                     # Subobject count
                     to_send.write(struct.pack(">B", 1))
@@ -1467,7 +1469,7 @@ class GameServer:
                 # Team Death Match HUD
                 to_send.write(struct.pack("<BIH", 15, 25000, 1))
 
-            # Classlimits
+            # Class limits
             for x in range(10):
                 to_send.write(struct.pack(">B", 255))
 
@@ -1479,9 +1481,9 @@ class GameServer:
         commands_done = 0
         
         while 10 > commands_done:
-            recieved_command = None
+            received_command = None
             try:
-                recieved_command = conn.recv(1)[0]
+                received_command = conn.recv(1)[0]
             except ConnectionError:
                 if player_to_service not in players_to_remove:
                     players_to_remove.append(player_to_service)
@@ -1496,21 +1498,21 @@ class GameServer:
                 commands_done = 10
                 break
 
-            if not recieved_command:
+            if not received_command:
                 commands_done = 10
                 break
             
             # print("Received Player Data")
-            # print(recieved_command[0])
-            # print(recieved_command)
+            # print(received_command[0])
+            # print(received_command)
 
             # Reactions to client data
-            if recieved_command == PLAYER_LEAVE:
+            if received_command == PLAYER_LEAVE:
                 print("Player Left???")
                 if player_to_service not in players_to_remove:
                     players_to_remove.append(player_to_service)
 
-            elif recieved_command == PLAYER_CHANGETEAM:
+            elif received_command == PLAYER_CHANGETEAM:
                 print("Received Change Team")
                 new_team = conn.recv(1)[0]
                 if new_team < 0 or 2 < new_team:
@@ -1537,7 +1539,7 @@ class GameServer:
                     player_list.index(player_to_service),
                     player_to_service.team))
 
-            elif recieved_command == PLAYER_CHANGECLASS:
+            elif received_command == PLAYER_CHANGECLASS:
                 print("Received Change Class")
                 player_to_service.respawn_timer = 5
                 player_to_service.character_object = None
@@ -1549,7 +1551,7 @@ class GameServer:
                     player_list.index(player_to_service),
                     player_to_service.class_))
 
-            elif recieved_command == INPUTSTATE:
+            elif received_command == INPUTSTATE:
                 data = conn.recv(4)
                 if player_to_service.character_object is not None:
                     player_to_service.character_object.key_state = data[0]
@@ -1561,14 +1563,14 @@ class GameServer:
                     player_to_service.character_object.released_keys |= ~player_to_service.character_object.key_state & player_to_service.character_object.last_key_state
                     player_to_service.character_object.last_key_state = player_to_service.character_object.key_state
 
-            elif recieved_command == CHAT_BUBBLE:
+            elif received_command == CHAT_BUBBLE:
                 bubble_image = conn.recv(1)[0]
                 self.server_to_send.write(struct.pack("<BBB",
                     CHAT_BUBBLE,
                     player_list.index(player_to_service),
                     bubble_image))
 
-            elif recieved_command == OMNOMNOMNOM:
+            elif received_command == OMNOMNOMNOM:
                 if player_to_service.character_object is not None:
                     if (not player_to_service.humiliated
                     and not player_to_service.character_object.taunting
@@ -1580,7 +1582,7 @@ class GameServer:
                             player_list.index(player_to_service)))
                         # Thing needs to happen here
 
-            elif recieved_command == TOGGLE_ZOOM:
+            elif received_command == TOGGLE_ZOOM:
                 if player_to_service.character_object is not None:
                     if player_to_service.class_ == CLASS_SNIPER:
                         self.server_to_send.write(struct.pack("<BB",
@@ -1588,7 +1590,7 @@ class GameServer:
                             player_list.index(player_to_service)))
                         # Thing needs to happen here
 
-            elif recieved_command == PLAYER_CHANGENAME:
+            elif received_command == PLAYER_CHANGENAME:
                 name_length = conn.recv(1)[0]
                 name = str(conn.recv(name_length).decode('utf-8'))
                 self.server_to_send.write(struct.pack("<BBB",
@@ -1598,10 +1600,10 @@ class GameServer:
                 self.server_to_send.write(bytes(name, "utf-8"))
                 
             else:
-                print("Recieved unimplemented command")
-                print(struct.unpack(">B", data))
-                print(struct.unpack(">b", data))
-                print(data)
+                print("Received unimplemented command")
+                print(struct.unpack(">B", received_command))
+                print(struct.unpack(">b", received_command))
+                print(received_command)
             
             commands_done += 1
 
@@ -1656,7 +1658,6 @@ class GameServer:
                         self.process_client_commands(player_to_service)
 
                 # Send players server update
-                test_time = time.time()
                 if (frame % 7) == 0:
                     self.server_to_send.write(self.serialize_state(QUICK_UPDATE))
                 else:
@@ -1727,7 +1728,7 @@ class GameServer:
             # Joins one new player each loop
             for joining_player in joining_players:
                 if joining_player.service_connection(self):
-                    # Player either joined succesfully or failed to connect
+                    # Player either joined successfully or failed to connect
                     joining_players.remove(joining_player)
 
 
