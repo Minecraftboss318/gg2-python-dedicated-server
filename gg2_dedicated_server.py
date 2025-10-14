@@ -144,6 +144,17 @@ def server_registration():
         print("---Registration Packet Sent---")
 
 
+def server_deregistration():
+    # Assembles Packet
+    # Deregistration ID
+    deregistration_packet = uuid.UUID("488984ac-45dc-86e1-9901-98dd1c01c064").bytes
+    deregistration_packet += SERVER_ID
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.sendto(deregistration_packet, (REG_LOBBY_DOMAIN, REG_LOBBY_PORT))
+    print("Deregistration Packet Sent")
+
+
 def upnp_port_mapping():
     # UPNP port forwarding
     upnp = miniupnpc.UPnP()
@@ -1788,6 +1799,8 @@ if __name__ == "__main__":
         print(f"EXCEPTION: {e}")
     finally:
         print("")
+        if REGISTER_SERVER:
+            server_deregistration()
         if USE_UPNP:
             upnp_exit()
 
