@@ -39,10 +39,10 @@ USE_UPNP = bool(int(config["Connection Settings"]["use_upnp"]))
 REGISTER_SERVER = bool(int(config["Connection Settings"]["use_lobby"]))
 MAP_DOWNLOAD_LIMIT_BPS = int(config["Connection Settings"]["total_map_download_bandwidth_in_bytes_per_second"])
 # Server Settings
-server_name = str(config["Server Settings"]["server_name"])
-welcome_message = str(config["Server Settings"]["welcome_message"])
-host_name = str(config["Server Settings"]["host_name"])
-server_password = str(config["Server Settings"]["password"])
+server_name = str(config["Server Settings"]["server_name"])[:255]
+welcome_message = str(config["Server Settings"]["welcome_message"])[:255]
+host_name = str(config["Server Settings"]["host_name"])[:MAX_PLAYERNAME_LENGTH]
+server_password = str(config["Server Settings"]["password"])[:255]
 max_players = int(config["Server Settings"]["max_players"])
 # Plugin Settings
 server_plugins_required = bool(int(config["Plugin Settings"]["server_plugins_required"]))
@@ -430,7 +430,7 @@ class Player:
         self.team = team
         self.class_ = class_
         self.connection = connection
-        self.name = name
+        self.name = name[:MAX_PLAYERNAME_LENGTH]
         self.kicked = False
 
         self.queue_jump = False
@@ -1592,12 +1592,12 @@ class GameServer:
 
             elif received_command == PLAYER_CHANGENAME:
                 name_length = conn.recv(1)[0]
-                name = str(conn.recv(name_length).decode('utf-8'))
+                player_to_service.name = str(conn.recv(name_length).decode('utf-8'))[:MAX_PLAYERNAME_LENGTH]
                 self.server_to_send.write(struct.pack("<BBB",
                     PLAYER_CHANGENAME,
                     player_list.index(player_to_service),
                     name_length))
-                self.server_to_send.write(bytes(name, "utf-8"))
+                self.server_to_send.write(bytes(player_to_service.name, "utf-8"))
                 
             else:
                 print("Received unimplemented command")
@@ -1790,9 +1790,10 @@ def main():
 
 
 if __name__ == "__main__":
-    assert SERVER_PORT >= 0
-    assert MAP_DOWNLOAD_LIMIT_BPS >= 0
-    assert max_players >= 0
+    assert SERVER_PORT >= 0 and SERVER_PORT <= 65535, "server_port must be a valid port number"
+    assert MAP_DOWNLOAD_LIMIT_BPS >= 0, "total_map_download_bandwidth_in_bytes_per_second cannot be a negative number"
+    assert max_players >= 0, "max_players cannot be a negative number"
+    assert max_players <= 255, "max_players cannot exceed 255"
 
     try:
         main()
