@@ -47,16 +47,143 @@ max_players = int(config["Server Settings"]["max_players"])
 server_plugins_required = bool(int(config["Plugin Settings"]["server_plugins_required"]))
 server_plugins_list = str(config["Plugin Settings"]["server_plugin_list"])
 
-#Frame/Tick Variables
+# Frame/Tick Variables
 delta_factor = 1
 skip_delta_factor = 1/2
 ticks_per_virtual = 1
 frameskip = 2
 room_speed = 30
 
+# Protocol ID
+PROTOCOL_ID = struct.pack(">16B", 179, 28, 34, 9, 66, 86, 154, 25, 208, 239, 199, 28, 83, 115, 189, 117)
+
 # --------------------------------------------------------------------------
 # --------------------------------Functions---------------------------------
 # --------------------------------------------------------------------------
+def create_reg_packet():
+    global REG_PACKET_ONE, REG_PACKET_TWO, REG_PACKET_THREE
+    # Setting up pieces of packet for registration
+    # Registration Packet 1
+    REG_PACKET_ONE = struct.pack(
+        ">16B",
+        181,
+        218,
+        226,
+        232,
+        66,
+        79,
+        158,
+        208,
+        15,
+        203,
+        140,
+        33,
+        199,
+        202,
+        19,
+        82,
+    ) # Registration ID
+    REG_PACKET_ONE += struct.pack(
+        ">16B",
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+        np.random.randint(256),
+    ) # Server ID
+    REG_PACKET_ONE += struct.pack(
+        ">16B",
+        28,
+        207,
+        22,
+        177,
+        67,
+        109,
+        133,
+        111,
+        80,
+        77,
+        204,
+        26,
+        243,
+        6,
+        170,
+        167,
+    )  # Lobby ID
+    REG_PACKET_ONE += struct.pack(">B", 0)            # Connection Type (UDP or TCP)
+    REG_PACKET_ONE += struct.pack(">H", SERVER_PORT)  # Hosting Port
+    REG_PACKET_ONE += struct.pack(">H", max_players)  # Player Limit
+
+    # Registration Packet 2
+    REG_PACKET_TWO = struct.pack(">H", 7) # Amount of Value Groups
+    # Server Name
+    # Server Name Key Length
+    REG_PACKET_TWO += struct.pack(">B", 4)
+    # Server Name Key
+    REG_PACKET_TWO += bytes("name", "utf-8")
+    # Server Name Length
+    REG_PACKET_TWO += struct.pack(">H", len(server_name))
+    # Server Name
+    REG_PACKET_TWO += bytes(server_name, "utf-8")
+
+    # Game Name
+    # Game Name Key Length
+    REG_PACKET_TWO += struct.pack(">B", 4)
+    # Game Name Key
+    REG_PACKET_TWO += bytes("game", "utf-8")
+    # Game Name Length
+    REG_PACKET_TWO += struct.pack(">H", 17)
+    # Game Name
+    REG_PACKET_TWO += bytes("GG2 Python Server", "utf-8")
+
+    # Game Short
+    # Game Short Key Length
+    REG_PACKET_TWO += struct.pack(">B", 10)
+    # Game Short Key
+    REG_PACKET_TWO += bytes("game_short", "utf-8")
+    # Game Short Length
+    REG_PACKET_TWO += struct.pack(">H", 5)
+    # Game Short
+    REG_PACKET_TWO += bytes("GGPDS", "utf-8")
+
+    # Game Version
+    # Game Version Key Length
+    REG_PACKET_TWO += struct.pack(">B", 8)
+    # Game Version Key
+    REG_PACKET_TWO += bytes("game_ver", "utf-8")
+    # Game Version Length
+    REG_PACKET_TWO += struct.pack(">H", 0)
+    # Game Version
+    REG_PACKET_TWO += bytes("", "utf-8")
+
+    # Game URL
+    # Game URL Key Length
+    REG_PACKET_TWO += struct.pack(">B", 8)
+    # Game URL Key
+    REG_PACKET_TWO += bytes("game_url", "utf-8")
+    # Game URL Length
+    REG_PACKET_TWO += struct.pack(">H", 63)
+    # Game URL
+    REG_PACKET_TWO += bytes("https://github.com/Minecraftboss318/gg2-python-dedicated-server", "utf-8")
+
+    # Registration Packet Const 3
+    REG_PACKET_THREE = struct.pack(">B", 11)             # Protocol ID Key Length
+    REG_PACKET_THREE += bytes("protocol_id", "utf-8")    # Protocol ID Key
+    REG_PACKET_THREE += struct.pack(">H", 16)            # Protocol ID Length
+    REG_PACKET_THREE += PROTOCOL_ID
+
+
 # Updates lobby server of server existance
 def server_registration():
     if REGISTER_SERVER:
@@ -1678,148 +1805,11 @@ players_to_remove = []
 bullet_list = []
 
 
-# Stuff below is setting up packet for registration
-# Registration Packet 1
-REG_PACKET_ONE = struct.pack(
-    ">16B",
-    181,
-    218,
-    226,
-    232,
-    66,
-    79,
-    158,
-    208,
-    15,
-    203,
-    140,
-    33,
-    199,
-    202,
-    19,
-    82,
-) # Registration ID
-REG_PACKET_ONE += struct.pack(
-    ">16B",
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-    np.random.randint(256),
-) # Server ID
-REG_PACKET_ONE += struct.pack(
-    ">16B",
-    28,
-    207,
-    22,
-    177,
-    67,
-    109,
-    133,
-    111,
-    80,
-    77,
-    204,
-    26,
-    243,
-    6,
-    170,
-    167,
-)  # Lobby ID
-REG_PACKET_ONE += struct.pack(">B", 0)            # Connection Type (UDP or TCP)
-REG_PACKET_ONE += struct.pack(">H", SERVER_PORT)  # Hosting Port
-REG_PACKET_ONE += struct.pack(">H", max_players)  # Player Limit
-
-# Registration Packet 2
-REG_PACKET_TWO = struct.pack(">H", 7) # Amount of Value Groups
-# Server Name
-# Server Name Key Length
-REG_PACKET_TWO += struct.pack(">B", 4)
-# Server Name Key
-REG_PACKET_TWO += bytes("name", "utf-8")
-# Server Name Length
-REG_PACKET_TWO += struct.pack(">H", len(server_name))
-# Server Name
-REG_PACKET_TWO += bytes(server_name, "utf-8")
-
-# Game Name
-# Game Name Key Length
-REG_PACKET_TWO += struct.pack(">B", 4)
-# Game Name Key
-REG_PACKET_TWO += bytes("game", "utf-8")
-# Game Name Length
-REG_PACKET_TWO += struct.pack(">H", 17)
-# Game Name
-REG_PACKET_TWO += bytes("GG2 Python Server", "utf-8")
-
-# Game Short
-# Game Short Key Length
-REG_PACKET_TWO += struct.pack(">B", 10)
-# Game Short Key
-REG_PACKET_TWO += bytes("game_short", "utf-8")
-# Game Short Length
-REG_PACKET_TWO += struct.pack(">H", 5)
-# Game Short
-REG_PACKET_TWO += bytes("GGPDS", "utf-8")
-
-# Game Version
-# Game Version Key Length
-REG_PACKET_TWO += struct.pack(">B", 8)
-# Game Version Key
-REG_PACKET_TWO += bytes("game_ver", "utf-8")
-# Game Version Length
-REG_PACKET_TWO += struct.pack(">H", 0)
-# Game Version
-REG_PACKET_TWO += bytes("", "utf-8")
-
-# Game URL
-# Game URL Key Length
-REG_PACKET_TWO += struct.pack(">B", 8)
-# Game URL Key
-REG_PACKET_TWO += bytes("game_url", "utf-8")
-# Game URL Length
-REG_PACKET_TWO += struct.pack(">H", 63)
-# Game URL
-REG_PACKET_TWO += bytes("https://github.com/Minecraftboss318/gg2-python-dedicated-server", "utf-8")
-
-# Registration Packet Const 3
-REG_PACKET_THREE = struct.pack(">B", 11)             # Protocol ID Key Length
-REG_PACKET_THREE += bytes("protocol_id", "utf-8")    # Protocol ID Key
-REG_PACKET_THREE += struct.pack(">H", 16)            # Protocol ID Length
-PROTOCOL_ID = struct.pack(
-    ">16B",
-    179,
-    28,
-    34,
-    9,
-    66,
-    86,
-    154,
-    25,
-    208,
-    239,
-    199,
-    28,
-    83,
-    115,
-    189,
-    117
-) # Protocol ID
-REG_PACKET_THREE += PROTOCOL_ID
-
-
 def main():
+    # Defines parts of registration packet
+    if REGISTER_SERVER:
+        create_reg_packet()
+    
     # Maps UPNP port if UPNP is enabled
     if USE_UPNP:
         upnp_thread = threading.Thread(target = upnp_port_mapping, args = ())
@@ -1861,6 +1851,8 @@ def main():
 
 if __name__ == "__main__":
     assert SERVER_PORT >= 0
+    assert MAP_DOWNLOAD_LIMIT_BPS >= 0
+    assert max_players >= 0
 
     try:
         main()
