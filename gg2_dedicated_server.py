@@ -1317,6 +1317,258 @@ class Shot:
                         break
 
 
+def return_intel(team):
+    if loaded_map.intels[team] == None:
+        Intelligence(self.intel_bases[team].x, self.intel_bases[team].y, team)
+    else:
+        loaded_map.intels[team].x = loaded_map.intel_bases[team].x
+        loaded_map.intels[team].y = loaded_map.intel_bases[team].y
+        
+    loaded_map.intels[team].return_alarm = -1
+
+    game_server.server_to_send.write(struct.pack("<BB",
+        RETURN_INTEL,
+        team))
+
+def drop_intel(character):
+    character.intel = False
+    character.can_grab_intel = False
+    character.intel_cooldown = 300 / delta_factor
+
+    opposite_team = not character.player_object.team
+    loaded_map.intels[opposite_team] = Intelligence(character.x, character.y, opposite_team)
+    loaded_map.intels[opposite_team].return_alarm = np.round(character.intel_recharge / delta_factor)
+    game_server.server_to_send.write(struct.pack("<BB",
+        DROP_INTEL,
+        player_list.index(character.player_object)))
+
+
+class Intelligence:
+    def __init__(self, x, y, team):
+        object_list.append(self)
+
+        self.collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-9, -12, 19, 19  Works: -8.5, -11.5, 19, 19
+        self.rotatable = False
+        self.x = x
+        self.y = y
+        self.team = team
+        self.return_alarm = -1
+
+    def remove(self):
+        object_list.remove(self)
+        loaded_map.intels[self.team] = None
+
+    def handle_alarms(self):
+        if self.return_alarm == 0:
+            return_intel(self.team)
+        if self.return_alarm >= 0:
+            self.return_alarm -= 1
+
+        
+class GamemodeInvasion:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = 0
+        self.setup_timer = 1800
+
+        self.winners = -1
+
+        self.red_caps = 0
+
+    def normal_step(self):
+        # Add virtual ticks later
+        if self.setup_timer > 0:
+            self.setup_timer -= 1
+
+        if self.timer > 0:
+            self.timer -= 1 * delta_factor
+
+        red_is_capping = (loaded_map.intels[1] == None)
+        # Workaround (Intel Timer not implemented)
+        if not red_is_capping:
+            red_is_capping = (loaded_map.intels[1].x != loaded_map.intel_bases[1].x or loaded_map.intels[1].y != loaded_map.intel_bases[1].y)
+
+        if self.red_caps >= cap_limit:
+            self.winners = TEAM_RED
+        elif self.timer <= 0 and (not self.red_is_capping or self.red_caps+1 < cap_limit):
+            self.winners = TEAM_BLUE
+
+        if self.timer <= 0 and self.winners == -1:
+            self.overtime = True
+
+
+class GamemodeCTF:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = 0
+        self.setup_timer = 0
+
+        self.winners = -1
+
+        self.red_caps = 0
+        self.blue_caps = 0
+
+    def normal_step(self):
+        red_is_capping = (loaded_map.intels[1] == None)
+        blue_is_capping = (loaded_map.intels[0] == None)
+        if not red_is_capping:
+            red_is_capping = (loaded_map.intels[1].x != loaded_map.intel_bases[1].x or loaded_map.intels[1].y != loaded_map.intel_bases[1].y)
+        if not blue_is_capping:
+            blue_is_capping = (loaded_map.intels[0].x != loaded_map.intel_bases[0].x or loaded_map.intels[0].y != loaded_map.intel_bases[0].y)
+
+        if self.timer > 0:
+            self.timer -= 1 * delta_factor
+
+        if (self.red_caps >= cap_limit) or (self.blue_caps >= cap_limit) or self.timer<=0:
+            if self.red_caps > self.blue_caps:
+                self.winners = TEAM_RED
+            elif self.blue_caps > self.red_caps:
+                self.winners = TEAM_BLUE
+            elif not self.red_is_capping and not self.blue_is_capping and self.blue_caps == self.red_caps:
+                self.winners = TEAM_SPECTATOR
+
+        if self.timer <= 0 and self.winners == -1:
+            self.overtime = True
+
+
+class GamemodeGen:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = 0
+        self.setup_timer = 0
+
+        self.winners = -1
+
+    def normal_step(self):
+        if self.timer > 0:
+            self.timer -= 1 * delta_factor
+        elif timer <= 0 and None not in loaded_map.generators:
+            with gen in loaded_map.generators:
+                if gen != None:
+                    if gen.hp >= gen.max_hp*0.66:
+                        if gen.team == TEAM_RED:
+                            red_stage = 3
+                        else:
+                            blue_stage = 3
+                    elif gen.hp >= gen.max_hp*0.33:
+                        if gen.team == TEAM_RED:
+                            red_stage = 2
+                        else:
+                            blue_stage = 2
+                    else:
+                        if gen.team == TEAM_RED:
+                            red_stage = 1
+                        else:
+                            blue_stage = 1
+
+            if red_stage > blue_stage and loaded_map.generators[0].sheild_alarm > -1:
+                self.overtime = True
+            elif red_stage < blue_stage and loaded_map.generators[1].sheild_alarm > -1:
+                self.overtime = True
+            elif red_stage == blue_stage and (loaded_map.generators[0].sheild_alarm > -1 or loaded_map.generators[1].sheild_alarm > -1):
+                self.overtime = True
+            else:
+                if red_stage > blue_stage:
+                    self.winners = TEAM_RED;
+                if red_stage < blue_stage:
+                    self.winners = TEAM_BLUE;
+                if red_stage == blue_stage:
+                    self.winners = TEAM_SPECTATOR;
+
+
+# Needs Work
+class GamemodeArena:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = 0
+        self.setup_timer = 0
+
+        self.winners = -1
+
+        self.red_wins = 0
+        self.blue_wins = 0
+        self.end_count = 0
+        self.round_start = 0
+        self.cp_unlock = 1800
+        self.red_team_characters
+        self.blue_team_characters
+        self.state = ARENA_STATE_WAITING
+
+    def normal_step(self):
+        pass
+        # No
+
+
+# Needs Work
+class GamemodeKOTH:
+    def __init__(self):
+        self.red_timer = 180 * 30
+        self.blue_timer = 180 * 30
+        self.host_timer = time_limit_minutes * 30 * 60
+        self.setup_timer = 0
+
+        self.winners = -1
+
+        self.cp_unlock = 900
+
+    def normal_step(self):
+        pass
+        # No
+
+
+# Needs Work
+class GamemodeDKOTH:
+    def __init__(self):
+        self.red_timer = 180 * 30
+        self.blue_timer = 180 * 30
+        self.host_timer = time_limit_minutes * 30 * 60
+        self.setup_timer = 0
+
+        self.winners = -1
+
+        self.cp_unlock = 900
+
+    def normal_step(self):
+        pass
+        # No
+
+
+# Needs Work
+class GamemodeControlPoint:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = 0
+        self.setup_timer = 0
+
+        self.winners = -1
+
+    def normal_step(self):
+        pass
+        # No
+
+
+# Needs Work
+class GamemodeTDM:
+    def __init__(self):
+        self.time_limit = time_limit_minutes * 30 * 60
+        self.timer = self.time_limit
+        self.overtime = False
+        self.setup_timer = 0
+
+        self.winners = -1
+
+        self.kill_limit = tdm_kill_limit
+
+    def normal_step(self):
+        pass
+        # No
+
+
 class GG2Map:
     def __init__(self, gg2_map_data):
         self.name = gg2_map_data[0]
@@ -1329,6 +1581,7 @@ class GG2Map:
         self.red_spawns = []
         self.blue_spawns = []
         self.setup_gates = []
+        self.intel_bases = [None, None]
         self.intels = [None, None]
         self.generators = [None, None]
         self.arena_control_point = None
@@ -1348,9 +1601,15 @@ class GG2Map:
                 self.setup_gates.append(entity)
                 
             elif entity.type == "redintel":
-                self.intels[0] = entity
+                self.intel_bases[0] = copy.replace(entity, type="RedIntelBase")
+                self.intel_bases[0].collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-9, -12, 19, 19  Works: -8.5, -11.5, 19, 19
+                self.intel_bases[0].rotatable = False
+                self.intels[0] = Intelligence(self.intel_bases[TEAM_RED].x, self.intel_bases[TEAM_RED].y, TEAM_RED)
             elif entity.type == "blueintel":
-                self.intels[1] = entity
+                self.intel_bases[1] = copy.replace(entity, type="BlueIntelBase")
+                self.intel_bases[1].collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-9, -12, 19, 19  Works: -8.5, -11.5, 19, 19
+                self.intel_bases[1].rotatable = False
+                self.intels[1] = Intelligence(self.intel_bases[TEAM_BLUE].x, self.intel_bases[TEAM_BLUE].y, TEAM_BLUE)
 
             elif entity.type == "GeneratorRed":
                 self.generators[0] = entity
@@ -1373,23 +1632,32 @@ class GG2Map:
             elif entity.type == "controlPoint2":
                 self.control_point_two.append(entity)
 
-        # Figure out what HUD to use
+        # Figure out what Gamemode to use
+        self.gamemode = None
         if self.intels != [None, None]:
             if self.setup_gates:
+                self.gamemode = GamemodeInvasion()
                 self.hud_type = "InvasionHUD"
             else:
+                self.gamemode = GamemodeCTF()
                 self.hud_type = "CTFHUD"
         elif self.generators != [None, None]:
+            self.gamemode = GamemodeGen()
             self.hud_type = "GeneratorHUD"
         elif self.arena_control_point is not None:
+            self.gamemode = GamemodeArena()
             self.hud_type = "ArenaHUD"
-        elif self.koth_control_point is not None:        
+        elif self.koth_control_point is not None:
+            self.gamemode = GamemodeKOTH()
             self.hud_type = "KothHUD"
-        elif self.dkoth_control_points != [None, None]:        
+        elif self.dkoth_control_points != [None, None]:
+            self.gamemode = GamemodeDKOTH()
             self.hud_type = "DKothHUD"
         elif self.control_point_one or self.control_point_two:
+            self.gamemode = GamemodeControlPoint()
             self.hud_type = "ControlPointHUD"
         else:
+            self.gamemode = GamemodeTDM()
             self.hud_type = "TeamDeathmatchHUD"
 
 
@@ -1711,6 +1979,10 @@ class GameServer:
                         self.process_client_commands(player_to_service)
 
                 # Send players server update
+                if self.sync_timer or (frame % 3600) == 0 or loaded_map.gamemode.setup_timer == 180:
+                    self.server_to_send.write(self.serialize_state(CAPS_UPDATE))
+                    sync_timer = False
+                    
                 if (frame % 7) == 0:
                     self.server_to_send.write(self.serialize_state(QUICK_UPDATE))
                 else:
