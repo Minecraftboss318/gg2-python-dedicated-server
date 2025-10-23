@@ -469,13 +469,22 @@ class Player:
     
         self.corpse = None
 
-        self.respawn_timer = 1
+        self.respawn_timer = -1
 
     def remove(self):
         if self.character_object:
             self.character_object.remove()
         object_list.remove(self)
         player_list.remove(self)
+
+    def handle_alarms(self):
+        if (self.respawn_timer == 0
+                and self.character_object is None
+                and (self.team == TEAM_RED or self.team == TEAM_BLUE)
+                and (0 <= self.class_ <= 9)):
+            self.respawn()
+        if self.respawn_timer >= 0:
+            self.respawn_timer -= 1
 
     def respawn(self):
         # Player Spawning
@@ -622,7 +631,7 @@ class Character:
 
         # can_grab_intel- used for droppan intel
         self.can_grab_intel = True
-        #alarm[1] = 0
+        self.intel_cooldown = -1
         self.intel_recharge = 0
     
         # Control Point
@@ -692,6 +701,12 @@ class Character:
             self.current_weapon.remove()
         object_list.remove(self)
         self.player_object.character_object = None
+
+    def handle_alarms(self):
+        if self.intel_cooldown == 0:
+            self.can_grab_intel = True
+        if self.intel_cooldown >= 0:
+            self.intel_cooldown -= 1
 
     def move_outside_solid(self, direction, max_dist):
         if direction == 0:
@@ -1178,7 +1193,7 @@ class Scattergun(Weapon):
         self.recoil_time = self.refire_time
 
         self.ready_to_shoot_alarm = self.refire_time / delta_factor
-        self.reload_alarm = 0
+        self.reload_alarm = -1
 
     def reload(self):
         if self.ammo_count < self.max_ammo:
@@ -1186,6 +1201,17 @@ class Scattergun(Weapon):
 
         if self.ammo_count < self.max_ammo:
             self.reload_alarm = self.reload_time / delta_factor
+
+    def handle_alarms(self):
+        if self.reload_alarm == 0:
+            self.reload()
+        if self.reload_alarm >= 0:
+            self.reload_alarm -= 1
+
+        if self.ready_to_shoot_alarm == 0:
+            self.ready_shooting()
+        if self.ready_to_shoot_alarm >= 0:
+            self.ready_to_shoot_alarm -= 1
 
     def fire_weapon(self):
         if self.ready_to_shoot and self.ammo_count > 0:
@@ -1648,29 +1674,11 @@ class GameServer:
             commands_done += 1
 
     def process_client_alarms(self):
-        for player_to_service in player_list:
-            if player_to_service.id_ != 1000:
-                # Respawn Alarm
-                if player_to_service.respawn_timer >= 0:
-                    player_to_service.respawn_timer -= 1
-                if (player_to_service.respawn_timer == 0
-                        and player_to_service.character_object is None
-                        and (player_to_service.team == TEAM_RED
-                             or player_to_service.team == TEAM_BLUE)
-                        and (0 <= player_to_service.class_ <= 9)):
-                    player_to_service.respawn()
-
-                if player_to_service.character_object is not None:
-                    if player_to_service.character_object.current_weapon.reload_alarm >= 0:
-                        player_to_service.character_object.current_weapon.reload_alarm -= 1
-                    if player_to_service.character_object.current_weapon.reload_alarm == 0:
-                        player_to_service.character_object.current_weapon.reload()
-
-                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm >= 0:
-                        player_to_service.character_object.current_weapon.ready_to_shoot_alarm -= 1
-                    if player_to_service.character_object.current_weapon.ready_to_shoot_alarm == 0:
-                        player_to_service.character_object.current_weapon.ready_shooting()
-
+        for object_ in object_list:
+            try:
+                object_.handle_alarms()
+            except:
+                pass
 
     def run_game_server_networking(self):
         self.server_to_send = BytesIO()
