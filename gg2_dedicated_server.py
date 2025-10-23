@@ -24,7 +24,8 @@ from gm8_like_functions import *
 config = configparser.ConfigParser()
 if not os.path.isfile("server_conf.ini"):
     config["Connection Settings"] = {"server_port": "8190", "use_upnp": "0", "use_lobby": "1", "total_map_download_bandwidth_in_bytes_per_second": "50000"}
-    config["Server Settings"] = {"server_name": "Python Server", "welcome_message": "", "host_name": "Host", "password": "", "max_players": "10"}
+    config["Server Settings"] = {"server_name": "Python Server", "welcome_message": "", "host_name": "Host", "password": "", "max_players": "10", "respawn_time": "5"}
+    config["Map Settings"] = {"map_rotation": "", "shuffle_maps": "1", "cap_limit": "5", "time_limit": "15", "tdm_kill_limit": "30", "tdm_invulnerability_seconds": "5"}
     config["Plugin Settings"] = {"server_plugins_required": "0", "server_plugin_list": ""}
 
     with open("server_conf.ini", "w") as configfile:
@@ -45,6 +46,14 @@ welcome_message = str(config["Server Settings"]["welcome_message"])[:255]
 host_name = str(config["Server Settings"]["host_name"])[:MAX_PLAYERNAME_LENGTH]
 server_password = str(config["Server Settings"]["password"])[:255]
 max_players = int(config["Server Settings"]["max_players"])
+respawn_time = int(config["Server Settings"]["respawn_time"])
+# Map Settings
+str(config["Map Settings"]["map_rotation"])
+bool(int(config["Map Settings"]["shuffle_maps"]))
+cap_limit = int(config["Map Settings"]["cap_limit"])
+time_limit_minutes = int(config["Map Settings"]["time_limit"])
+tdm_kill_limit = int(config["Map Settings"]["tdm_kill_limit"])
+tdm_invul_seconds = int(config["Map Settings"]["tdm_invulnerability_seconds"])
 # Plugin Settings
 server_plugins_required = bool(int(config["Plugin Settings"]["server_plugins_required"]))
 server_plugins_list = str(config["Plugin Settings"]["server_plugin_list"])
@@ -1335,6 +1344,9 @@ class GameServer:
     def __init__(self):
         self.server_to_send = BytesIO()
         self.running_map_downloads = 0
+        self.sync_timer = False
+
+        self.tdm_invul_ticks = tdm_invul_seconds * 30 * 0.2
 
     def serialize_state(self, update_type):
         to_send = BytesIO()
@@ -1342,7 +1354,7 @@ class GameServer:
 
         if update_type == FULL_UPDATE:
             # tdm invulnerability ticks
-            to_send.write(struct.pack("<H", 30))
+            to_send.write(struct.pack("<H", clip_and_round(self.tdm_invul_ticks, 0, 65535)))
 
         to_send.write(struct.pack(">B", len(player_list)))
 
