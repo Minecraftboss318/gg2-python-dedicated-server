@@ -892,6 +892,17 @@ class Character:
                     self.double_jump_used = 1
                     self.move_status = 0
 
+        # Cloak
+        if (self.player_object.humiliated and num_to_bool(hex_as_int(self.pressed_keys) & 0x08)
+                and self.can_cloak and ((self.cloak_alpha == 1 and not self.cloak) or cloak)
+                and not self.intel and not self.taunting):
+            self.deathmath_invulnerable = 0
+            if self.current_weapon.ready_to_stab:
+                if self.cloak:
+                    self.can_grab_intel = False
+                    self.intel_cooldown = max(self.intel_cooldown, 25 / delta_factor)
+                self.cloak = not self.cloak
+
         # Friction based on move status
         if self.move_status == 1:
             self.control_factor = 0.65
@@ -945,6 +956,10 @@ class Character:
                 self.applied_gravity = self.applied_gravity + 0.54
             else:
                 self.applied_gravity = self.applied_gravity + 0.6
+
+        if self.intel:
+            if not self.omnomnomnom:
+                self.intel_recharge = min(INTEL_MAX_TIMER, self.intel_recharge + delta_factor * INTEL_MAX_TIMER/((3+abs(min(self.hspeed, 7))/3.5)*30))
 
     def normal_step(self):
         self.hspeed = min(abs(self.hspeed), 15) * sign(self.hspeed)
@@ -1034,7 +1049,34 @@ class Character:
             self.player_object.respawn_timer = 5
             self.player_object.character_object.remove()
             print("Killed Player")
+
+    def collision_step(self):
+        if colliding(self, loaded_map.intel_bases[self.player_object.team]):
+            if self.intel:
+                if self.player_object.team == TEAM_RED:
+                    loaded_map.gamemode.red_caps += 1
+                    loaded_map.intels[1] = Intelligence(loaded_map.intel_bases[TEAM_BLUE].x, loaded_map.intel_bases[TEAM_BLUE].y, TEAM_BLUE)
+                elif self.player_object.team == TEAM_BLUE:
+                    loaded_map.gamemode.blue_caps += 1
+                    loaded_map.intels[0] = Intelligence(loaded_map.intel_bases[TEAM_RED].x, loaded_map.intel_bases[TEAM_RED].y, TEAM_RED)
+
+                self.intel = False
+                game_server.server_to_send.write(struct.pack("<BB",
+                    SCORE_INTEL,
+                    player_list.index(self.player_object)))
+                game_server.sync_timer = True
             
+        opposite_team = not self.player_object.team
+        if loaded_map.intels[opposite_team] != None:
+            if colliding(self, loaded_map.intels[opposite_team]):
+                if self.can_grab_intel or loaded_map.intels[opposite_team].return_alarm <= 1:
+                    self.intel_recharge = max(0, loaded_map.intels[opposite_team].return_alarm * delta_factor)
+                    self.intel = True
+                    loaded_map.intels[opposite_team].remove()
+
+                    game_server.server_to_send.write(struct.pack("<BB",
+                        GRAB_INTEL,
+                        player_list.index(self.player_object)))
 
 
 class Scout(Character):
@@ -1730,7 +1772,7 @@ class GameServer:
                         to_send.write(struct.pack(">B", 0))
                         to_send.write(struct.pack(">B", 0))
                         
-                        to_send.write(struct.pack("<h", 0))
+                        to_send.write(struct.pack("<h", joining_player.character_object.intel_cooldown*delta_factor))
                         to_send.write(struct.pack(">B", joining_player.character_object.intel))
                         to_send.write(struct.pack("<h", joining_player.character_object.intel_recharge))
 
@@ -1746,23 +1788,31 @@ class GameServer:
         if update_type == FULL_UPDATE:
             if loaded_map.intels[0] is not None:
                 # Red Intel
-                to_send.write(struct.pack("<HHHh", 1,
+                to_send.write(struct.pack("<HHHh",
+                    1,
                     loaded_map.intels[0].x*5,
                     loaded_map.intels[0].y*5,
-                    -1))
+                    loaded_map.intels[0].return_alarm*delta_factor))
             else:
                 to_send.write(struct.pack("<H", 0))
             if loaded_map.intels[1] is not None:
                 # Blue Intel
-                to_send.write(struct.pack("<HHHh", 1,
+                to_send.write(struct.pack("<HHHh",
+                    1,
                     loaded_map.intels[1].x*5,
                     loaded_map.intels[1].y*5,
-                    -1))
+                    loaded_map.intels[1].return_alarm*delta_factor))
             else:
                 to_send.write(struct.pack("<H", 0))
-            # Cap limit, red caps, blue caps, server respawn time
-            to_send.write(struct.pack("<BBBB", 3, 0, 0, 5))
-            # HUD Networking
+            # Cap limit
+            to_send.write(struct.pack("<B", cap_limit))
+        if update_type == FULL_UPDATE or update_type == CAPS_UPDATE:
+            # red caps, blue caps, server respawn time
+            to_send.write(struct.pack("<BBB",
+                loaded_map.gamemode.red_caps,
+                loaded_map.gamemode.blue_caps,
+                respawn_time))
+            # "HUD" Networking
             if loaded_map.hud_type == "InvasionHUD":
                 # Invasion HUD
                 to_send.write(struct.pack("<BIH", 15, 25000, 120))
@@ -1802,7 +1852,7 @@ class GameServer:
             elif loaded_map.hud_type == "TeamDeathmatchHUD":
                 # Team Death Match HUD
                 to_send.write(struct.pack("<BIH", 15, 25000, 1))
-
+        if update_type == FULL_UPDATE:
             # Class limits
             for x in range(10):
                 to_send.write(struct.pack(">B", 255))
@@ -1932,7 +1982,12 @@ class GameServer:
                     player_list.index(player_to_service),
                     name_length))
                 self.server_to_send.write(bytes(player_to_service.name, "utf-8"))
-                
+
+            elif received_command == DROP_INTEL:
+                if player_to_service.character_object is not None:
+                    if player_to_service.character_object.intel:
+                        drop_intel(player_to_service.character_object)
+
             else:
                 print("Received unimplemented command")
                 print(struct.unpack(">B", received_command))
@@ -2011,8 +2066,12 @@ class GameServer:
                         if player_to_service.character_object is not None:
                             player_to_service.character_object.end_step()
 
-                for bullet in bullet_list:
-                    bullet.collision_step()
+                for object_ in object_list:
+                    try:
+                        object_.collision_step()
+                    except AttributeError as e:
+                        if e.name != "collision_step":
+                            raise
 
             # Make sure server updates 30 or 60 times a second
             time.sleep(max(0, (1/room_speed) - (time.time() - start_time) - 0.008)) #0.001 has overruns while 0.01 has high cpu usage
