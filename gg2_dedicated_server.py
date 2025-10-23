@@ -434,6 +434,7 @@ class JoiningPlayer:
     
 class Player:
     def __init__(self, connection, id_, name, team, class_):
+        object_list.append(self)
         self.id_ = id_
         
         self.character_object = None
@@ -469,6 +470,12 @@ class Player:
         self.corpse = None
 
         self.respawn_timer = 1
+
+    def remove(self):
+        if self.character_object:
+            self.character_object.remove()
+        object_list.remove(self)
+        player_list.remove(self)
 
     def respawn(self):
         # Player Spawning
@@ -520,12 +527,14 @@ class Player:
 
     def leave_server(self):
         game_server.server_to_send.write(struct.pack(">BB", PLAYER_LEAVE, player_list.index(self)))
-        player_list.remove(self)
+        self.remove()
         print("Player Socket Disconnect")
 
 
 class Character:
     def __init__(self, player_object):
+        object_list.append(self)
+        
         self.player_object = player_object
         self.x = 0
         self.y = 0
@@ -677,6 +686,12 @@ class Character:
         elif self.player_object.class_ == CLASS_QUOTE:
             # Temporary so choosing other classes doesn't crash
             self.current_weapon = Scattergun(self)
+
+    def remove(self):
+        if self.current_weapon:
+            self.current_weapon.remove()
+        object_list.remove(self)
+        self.player_object.character_object = None
 
     def move_outside_solid(self, direction, max_dist):
         if direction == 0:
@@ -1002,7 +1017,7 @@ class Character:
             255,
             25))
             self.player_object.respawn_timer = 5
-            self.player_object.character_object = None
+            self.player_object.character_object.remove()
             print("Killed Player")
             
 
@@ -1134,11 +1149,17 @@ class Quote(Character):
 
 class Weapon:
     def __init__(self, character_object):
+        object_list.append(self)
+        
         self.ready_to_shoot = False
         self.just_shot = False
 
         self.owner = character_object
         self.owner_player = character_object.player_object
+
+    def remove(self):
+        object_list.remove(self)
+        self.owner.current_weapon = None
 
     def ready_shooting(self):
         self.ready_to_shoot = True
@@ -1211,6 +1232,9 @@ class Scattergun(Weapon):
 
 class Shot:
     def __init__(self, owner, x, y, direction, speed):
+        object_list.append(self)
+        bullet_list.append(self)
+        
         self.collision_mask = ObjectMask(-16.5, -1.5, 17, 1) #-17, -2, 17, 1  Works: -16.5, -1.5, 17, 1
         self.rotatable = True
         self.x = x
@@ -1226,7 +1250,10 @@ class Shot:
         self.owner = owner
         self.owner_player = owner.player_object
         self.team = self.owner_player.team
-        bullet_list.append(self)
+
+    def remove(self):
+        object_list.remove(self)
+        bullet_list.remove(self)
         
     def normal_step(self):
         self.vspeed += 0.15 * delta_factor
@@ -1241,7 +1268,7 @@ class Shot:
         is_colliding += not place_free(self, self.x, self.y, loaded_map.wm_collision_rects)
         if is_colliding:
             # Destroy the bullet here
-            bullet_list.remove(self)
+            self.remove()
 
         self.x -= self.hspeed
         self.y -= self.vspeed
@@ -1260,7 +1287,7 @@ class Shot:
                         player.character_object.hp -= 8
                         player.character_object.hspeed = player.character_object.hspeed + (self.hspeed * 0.03)
                         player.character_object.vspeed = player.character_object.vspeed + (self.vspeed * 0.03)
-                        bullet_list.remove(self)
+                        self.remove()
                         break
 
 
@@ -1543,7 +1570,7 @@ class GameServer:
                     print("Killed Player")
 
                     player_to_service.respawn_timer = 5
-                    player_to_service.character_object = None
+                    player_to_service.character_object.remove()
                     
                 # Player Set Team
                 player_to_service.team = new_team
@@ -1555,7 +1582,7 @@ class GameServer:
             elif received_command == PLAYER_CHANGECLASS:
                 print("Received Change Class")
                 player_to_service.respawn_timer = 5
-                player_to_service.character_object = None
+                player_to_service.character_object.remove()
                 # Player Set Class
                 new_class = conn.recv(1)[0]
                 player_to_service.class_ = new_class
@@ -1649,7 +1676,12 @@ class GameServer:
         self.server_to_send = BytesIO()
         start_time = time.time()
         frame = 0
+        self.old_list = object_list.copy()
         while True:
+            if self.old_list != object_list:
+                print(object_list)
+                self.old_list = object_list.copy()
+                
             # Registers server with GG2 lobby server
             if (frame % 900) == 0:
                 server_registration()
@@ -1749,8 +1781,12 @@ class GameServer:
 # --------------------------------------------------------------------------
 # --------------END OF DEFINING START OF CODE EXECUTION---------------------
 # --------------------------------------------------------------------------
-# Creates list for players
+# Creates list for most objects
+object_list = []
+
+# Creates lists for players
 player_list = [Player(None, 1000, host_name, TEAM_SPECTATOR, CLASS_SCOUT)]
+object_list.pop(0)
 joining_players = []
 players_to_remove = []
 
