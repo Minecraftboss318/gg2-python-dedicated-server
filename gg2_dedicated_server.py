@@ -4,6 +4,7 @@ import miniupnpc
 import socket
 import struct
 import sys
+import copy
 from io import BytesIO
 import os.path
 import configparser

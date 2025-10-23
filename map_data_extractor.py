@@ -1,6 +1,7 @@
 from PIL import Image
 import hashlib
 import json
+import copy
 
 
 class Rectangle:
@@ -58,12 +59,22 @@ class LegacyEntity:
         self.y = int(y)
         self.yscale = int(yscale)
 
+    def __replace__(self, **changes):
+        object_copy = copy.copy(self)
+        object_copy.__dict__.update(changes)
+        return object_copy
+
 
 class Entity:
     def __init__(self, _dict):
         self.xscale = 1
         self.yscale = 1
         self.__dict__.update(_dict)
+
+    def __replace__(self, **changes):
+        object_copy = copy.copy(self)
+        object_copy.__dict__.update(changes)
+        return object_copy
 
 
 def get_image_entities(map_image_data):
